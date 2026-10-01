@@ -1,5 +1,5 @@
 # DNS Zone Manager Development Container (Go)
-FROM mcr.microsoft.com/devcontainers/go:1.27-bookworm
+FROM mcr.microsoft.com/devcontainers/go:2.3-bookworm
 
 # Remove expired yarn repo before apt-get update (present on some base images)
 RUN rm -f /etc/apt/sources.list.d/yarn.list || true
