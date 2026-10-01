@@ -25,7 +25,9 @@ test.describe('Scheduled Changes source filter', () => {
     );
   });
 
-  test('shows a Source column with a badge for every change', async ({ page }) => {
+  test('shows a Source column with a badge for every change', async ({
+    page,
+  }) => {
     await createDraft(page, `source-col-${Date.now()}`);
     await openScheduledView(page);
 
@@ -36,23 +38,33 @@ test.describe('Scheduled Changes source filter', () => {
     await expect(rows.first().locator('.source-badge')).toBeVisible();
   });
 
-  test('a change created in the scheduler is labelled Scheduled', async ({ page }) => {
+  test('a change created in the scheduler is labelled Scheduled', async ({
+    page,
+  }) => {
     const unique = `source-sched-${Date.now()}`;
     await createDraft(page, unique);
     await openScheduledView(page);
 
-    const row = page.locator('.scheduled-table tr', { hasText: `E2E ${unique}` });
+    const row = page.locator('.scheduled-table tr', {
+      hasText: `E2E ${unique}`,
+    });
     await expect(row).toBeVisible({ timeout: 10000 });
     await expect(row.locator('.source-badge')).toHaveText('Scheduled');
-    await expect(row.locator('.source-badge')).toHaveClass(/source-badge-scheduler/);
+    await expect(row.locator('.source-badge')).toHaveClass(
+      /source-badge-scheduler/,
+    );
   });
 
-  test('filtering to Manual hides scheduler-created changes', async ({ page }) => {
+  test('filtering to Manual hides scheduler-created changes', async ({
+    page,
+  }) => {
     const unique = `source-filter-${Date.now()}`;
     await createDraft(page, unique);
     await openScheduledView(page);
 
-    const row = page.locator('.scheduled-table tr', { hasText: `E2E ${unique}` });
+    const row = page.locator('.scheduled-table tr', {
+      hasText: `E2E ${unique}`,
+    });
     await expect(row).toBeVisible({ timeout: 10000 });
 
     await page.locator('.source-filter button:has-text("Manual")').click();
@@ -69,12 +81,16 @@ test.describe('Scheduled Changes source filter', () => {
     }
   });
 
-  test('filtering back to Scheduled shows the change again', async ({ page }) => {
+  test('filtering back to Scheduled shows the change again', async ({
+    page,
+  }) => {
     const unique = `source-back-${Date.now()}`;
     await createDraft(page, unique);
     await openScheduledView(page);
 
-    const row = page.locator('.scheduled-table tr', { hasText: `E2E ${unique}` });
+    const row = page.locator('.scheduled-table tr', {
+      hasText: `E2E ${unique}`,
+    });
     await expect(row).toBeVisible({ timeout: 10000 });
 
     await page.locator('.source-filter button:has-text("Manual")').click();
@@ -95,7 +111,9 @@ test.describe('Scheduled Changes source filter', () => {
     await createDraft(page, unique);
     await openScheduledView(page);
 
-    const row = page.locator('.scheduled-table tr', { hasText: `E2E ${unique}` });
+    const row = page.locator('.scheduled-table tr', {
+      hasText: `E2E ${unique}`,
+    });
     await expect(row).toBeVisible({ timeout: 10000 });
     await row.locator('button:has-text("View")').click();
 
@@ -147,7 +165,9 @@ test.describe('Scheduled Changes source filter', () => {
     await expect(row.locator('button:has-text("Revert")')).toHaveCount(0);
   });
 
-  test('the link from a webhook notification opens the change', async ({ page }) => {
+  test('the link from a webhook notification opens the change', async ({
+    page,
+  }) => {
     const unique = `manual-link-${Date.now()}`;
     await addRecordDirectly(page, unique);
     await skipUnlessAutorecorded(page, unique);
@@ -168,9 +188,9 @@ test.describe('Scheduled Changes source filter', () => {
     await expect(page.locator('#scheduled-change-detail')).toBeVisible({
       timeout: 10000,
     });
-    await expect(page.locator('#scheduled-change-detail .source-badge')).toHaveText(
-      'Manual',
-    );
+    await expect(
+      page.locator('#scheduled-change-detail .source-badge'),
+    ).toHaveText('Manual');
   });
 });
 
@@ -187,7 +207,8 @@ async function skipUnlessAutorecorded(page: Page, unique: string) {
     );
     if (response.ok()) {
       const changes = (await response.json()).changes || [];
-      if (changes.some((c: { name: string }) => c.name.includes(unique))) return;
+      if (changes.some((c: { name: string }) => c.name.includes(unique)))
+        return;
     }
     await page.waitForTimeout(250);
   }
@@ -212,7 +233,10 @@ async function addRecordDirectly(page: Page, unique: string) {
   await expect(page.locator('.modal-backdrop')).toBeVisible({ timeout: 5000 });
 
   await page.locator('.modal-body input').first().fill(unique);
-  await page.locator('.modal-body textarea, .modal-body input').last().fill('192.0.2.77');
+  await page
+    .locator('.modal-body textarea, .modal-body input')
+    .last()
+    .fill('192.0.2.77');
   await page.locator('.modal-footer button.btn-success').click();
 
   await expect(page.locator('.modal-backdrop')).toBeHidden({ timeout: 10000 });
@@ -229,19 +253,31 @@ async function createDraft(page: Page, unique: string) {
   await expect(page.locator('.modal-backdrop')).toBeVisible({ timeout: 5000 });
 
   await page.locator('.modal-body input').first().fill(unique);
-  await page.locator('.modal-body textarea, .modal-body input').last().fill('192.0.2.98');
+  await page
+    .locator('.modal-body textarea, .modal-body input')
+    .last()
+    .fill('192.0.2.98');
   await page.locator('.modal-footer button.btn-success').click();
 
-  await expect(page.locator('.atomic-indicator')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.atomic-indicator')).toBeVisible({
+    timeout: 5000,
+  });
   await page.locator('.atomic-indicator').click();
   await page.locator('button:has-text("Save as Change")').click();
-  await expect(page.locator('h3:has-text("Save as Scheduled Change")')).toBeVisible({
+  await expect(
+    page.locator('h3:has-text("Save as Scheduled Change")'),
+  ).toBeVisible({
     timeout: 5000,
   });
 
-  await page.locator('.modal-body input[type="text"]').first().fill(`E2E ${unique}`);
+  await page
+    .locator('.modal-body input[type="text"]')
+    .first()
+    .fill(`E2E ${unique}`);
   await page.locator('.modal-footer button:has-text("Save Change")').click();
-  await expect(page.locator('h3:has-text("Save as Scheduled Change")')).toBeHidden({
+  await expect(
+    page.locator('h3:has-text("Save as Scheduled Change")'),
+  ).toBeHidden({
     timeout: 10000,
   });
 

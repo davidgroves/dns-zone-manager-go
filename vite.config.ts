@@ -1,28 +1,30 @@
-import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { defineConfig } from 'vite';
 
 export default defineConfig(({ command }) => {
   const isServe = command === 'serve';
-  
+
   return {
     root: 'frontend',
-    
-    build: isServe ? {} : {
-      // SPA build copied into internal/ui/dist and embedded in the binary
-      outDir: resolve(__dirname, 'dist'),
-      emptyOutDir: true,
-    },
-    
+
+    build: isServe
+      ? {}
+      : {
+          // SPA build copied into internal/ui/dist and embedded in the binary
+          outDir: resolve(__dirname, 'dist'),
+          emptyOutDir: true,
+        },
+
     resolve: {
       alias: {
-        '@': resolve(__dirname, 'frontend')
-      }
+        '@': resolve(__dirname, 'frontend'),
+      },
     },
-    
+
     // Development server configuration
     server: {
       port: 5173,
-      host: true,  // Bind to 0.0.0.0 for container/devcontainer access
+      host: true, // Bind to 0.0.0.0 for container/devcontainer access
       // Optional dev-server proxy to the Go API (not used when the binary serves the SPA)
       proxy: {
         '/ui/config': 'http://localhost:8000',
@@ -33,7 +35,7 @@ export default defineConfig(({ command }) => {
           target: 'http://localhost:8000',
           ws: true,
         },
-      }
+      },
     },
   };
 });

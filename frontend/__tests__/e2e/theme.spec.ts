@@ -15,7 +15,10 @@ test.describe('Theme', () => {
   });
 
   test('login screen shows app name and theme toggle', async ({ page }) => {
-    test.skip(!(await backendRequiresLogin(page)), 'Auth disabled; no login screen');
+    test.skip(
+      !(await backendRequiresLogin(page)),
+      'Auth disabled; no login screen',
+    );
     await page.goto('/');
     await expect(page.locator('.login-container')).toBeVisible();
     await expect(page.locator('.login-card h1')).toContainText(/DNS Zone/);
@@ -88,7 +91,9 @@ test.describe('Theme', () => {
     await expect(page.locator('h2:has-text("Scheduled Changes")')).toHaveCount(
       0,
     );
-    await expect(page.locator('.zone-list, .zone-item, .sidebar')).toBeVisible();
+    await expect(
+      page.locator('.zone-list, .zone-item, .sidebar'),
+    ).toBeVisible();
   });
 
   test('authenticated header theme toggle works', async ({ page }) => {

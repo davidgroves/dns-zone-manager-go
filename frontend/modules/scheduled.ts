@@ -1,4 +1,9 @@
-import { API_BASE, api, formatDNSErrorWithRequestID, requestIDFromResponse } from '../api/client';
+import {
+  API_BASE,
+  api,
+  formatDNSErrorWithRequestID,
+  requestIDFromResponse,
+} from '../api/client';
 import type {
   AppState,
   ChangeSource,
@@ -12,8 +17,8 @@ import {
   buildCreatePayload,
   buildUpdatePayload,
   canRevertChange,
-  formFromChange,
   formatScheduledDisplay,
+  formFromChange,
   sourceBadgeClass,
   sourceLabel,
   utcIsoToLocalDatetime,
@@ -158,7 +163,10 @@ export function createScheduledMethods(_state: AppState) {
         );
         if (!response.ok) {
           const data = await response.json();
-          this.toast(formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          this.toast(
+            formatDNSErrorWithRequestID(data, requestIDFromResponse(response)),
+            'error',
+          );
           return;
         }
         const change = (await response.json()) as ScheduledChange;
@@ -285,7 +293,11 @@ export function createScheduledMethods(_state: AppState) {
           zone = `${zone}.`;
         }
         const payload = isEdit
-          ? buildUpdatePayload(this.scheduleForm, this.scheduleOps, this.prereqRows)
+          ? buildUpdatePayload(
+              this.scheduleForm,
+              this.scheduleOps,
+              this.prereqRows,
+            )
           : buildCreatePayload(
               this.scheduleForm,
               zone,
@@ -299,7 +311,10 @@ export function createScheduledMethods(_state: AppState) {
         });
         const data = await response.json();
         if (!response.ok) {
-          this.toast(`Failed to save: ${formatDNSErrorWithRequestID(data, requestIDFromResponse(response))}`, 'error');
+          this.toast(
+            `Failed to save: ${formatDNSErrorWithRequestID(data, requestIDFromResponse(response))}`,
+            'error',
+          );
           return;
         }
 
@@ -350,7 +365,10 @@ export function createScheduledMethods(_state: AppState) {
         const response = await api(url, this.apiKey);
         if (!response.ok) {
           const data = await response.json();
-          this.toast(`Failed to load changes: ${formatDNSErrorWithRequestID(data, requestIDFromResponse(response))}`, 'error');
+          this.toast(
+            `Failed to load changes: ${formatDNSErrorWithRequestID(data, requestIDFromResponse(response))}`,
+            'error',
+          );
           return;
         }
         const data = await response.json();
@@ -364,7 +382,10 @@ export function createScheduledMethods(_state: AppState) {
 
     scheduledStatusFilterLabel(this: ScheduledMethodContext): string {
       const filters = this.scheduledStatusFilters || [];
-      if (filters.length === 0 || filters.length === ALL_CHANGE_STATUSES.length) {
+      if (
+        filters.length === 0 ||
+        filters.length === ALL_CHANGE_STATUSES.length
+      ) {
         return 'All statuses';
       }
       if (filters.length <= 3) {
@@ -373,7 +394,10 @@ export function createScheduledMethods(_state: AppState) {
       return `${filters.length} statuses`;
     },
 
-    isScheduledStatusSelected(this: ScheduledMethodContext, status: ChangeStatus): boolean {
+    isScheduledStatusSelected(
+      this: ScheduledMethodContext,
+      status: ChangeStatus,
+    ): boolean {
       return (this.scheduledStatusFilters || []).includes(status);
     },
 
@@ -412,13 +436,19 @@ export function createScheduledMethods(_state: AppState) {
       // applied or failed. The default status filter hides applied changes,
       // which would make this filter look broken; widen it (visibly, in the
       // status dropdown) so the selection returns something.
-      if (source === 'manual' && !this.scheduledStatusFilters.includes('applied')) {
+      if (
+        source === 'manual' &&
+        !this.scheduledStatusFilters.includes('applied')
+      ) {
         this.scheduledStatusFilters = ['applied', 'failed'];
       }
       void this.loadScheduledChanges();
     },
 
-    sourceLabel(this: ScheduledMethodContext, source: string | null | undefined): string {
+    sourceLabel(
+      this: ScheduledMethodContext,
+      source: string | null | undefined,
+    ): string {
       return sourceLabel(source);
     },
 
@@ -477,7 +507,10 @@ export function createScheduledMethods(_state: AppState) {
         );
         if (!response.ok) {
           const data = await response.json();
-          this.toast(formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          this.toast(
+            formatDNSErrorWithRequestID(data, requestIDFromResponse(response)),
+            'error',
+          );
           this.selectedScheduledChange = null;
           this.updateUrlFromState();
           return;
@@ -523,7 +556,10 @@ export function createScheduledMethods(_state: AppState) {
         );
         const data = await response.json();
         if (!response.ok) {
-          this.toast(formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          this.toast(
+            formatDNSErrorWithRequestID(data, requestIDFromResponse(response)),
+            'error',
+          );
           return;
         }
         this.previewResult = data as PreviewResult;
@@ -555,7 +591,14 @@ export function createScheduledMethods(_state: AppState) {
         );
         const data = await response.json();
         if (!response.ok || !data.success) {
-          this.toast(data.message || formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          this.toast(
+            data.message ||
+              formatDNSErrorWithRequestID(
+                data,
+                requestIDFromResponse(response),
+              ),
+            'error',
+          );
         } else {
           this.toast(data.message || 'Change applied', 'success');
           if (this.selectedZone) {
@@ -583,7 +626,10 @@ export function createScheduledMethods(_state: AppState) {
         );
         const data = await response.json();
         if (!response.ok) {
-          this.toast(formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          this.toast(
+            formatDNSErrorWithRequestID(data, requestIDFromResponse(response)),
+            'error',
+          );
           return;
         }
         this.revertPreview = data as RevertPreview;
@@ -612,7 +658,14 @@ export function createScheduledMethods(_state: AppState) {
         );
         const data = await response.json();
         if (!response.ok || !data.success) {
-          this.toast(data.message || formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          this.toast(
+            data.message ||
+              formatDNSErrorWithRequestID(
+                data,
+                requestIDFromResponse(response),
+              ),
+            'error',
+          );
           return;
         }
         this.toast(data.message || 'Change reverted', 'success');
@@ -642,7 +695,10 @@ export function createScheduledMethods(_state: AppState) {
         );
         if (!response.ok) {
           const data = await response.json();
-          this.toast(formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          this.toast(
+            formatDNSErrorWithRequestID(data, requestIDFromResponse(response)),
+            'error',
+          );
           return;
         }
         this.toast('Change cancelled', 'success');
@@ -657,7 +713,10 @@ export function createScheduledMethods(_state: AppState) {
       }
     },
 
-    statusBadgeClass(this: ScheduledMethodContext, status: ChangeStatus): string {
+    statusBadgeClass(
+      this: ScheduledMethodContext,
+      status: ChangeStatus,
+    ): string {
       const map: Record<string, string> = {
         draft: 'muted',
         scheduled: 'info',
@@ -676,7 +735,10 @@ export function createScheduledMethods(_state: AppState) {
     },
 
     /** Whether a change can still be edited, previewed, applied or cancelled. */
-    isChangeEditable(this: ScheduledMethodContext, status: ChangeStatus): boolean {
+    isChangeEditable(
+      this: ScheduledMethodContext,
+      status: ChangeStatus,
+    ): boolean {
       return EDITABLE_STATUSES.includes(status);
     },
   };

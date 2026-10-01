@@ -1,4 +1,9 @@
-import { API_BASE, api, formatDNSErrorWithRequestID, requestIDFromResponse } from '../api/client';
+import {
+  API_BASE,
+  api,
+  formatDNSErrorWithRequestID,
+  requestIDFromResponse,
+} from '../api/client';
 import type { AppState, PageSizeMode, RRset } from '../types';
 import {
   COMMON_CLASSES,
@@ -332,7 +337,10 @@ export function createRecordMethods(_state: AppState) {
           await this.loadZones(null, false);
         } else {
           const err = await response.json();
-          this.toast(`Failed: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`, 'error');
+          this.toast(
+            `Failed: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`,
+            'error',
+          );
         }
       } catch (e) {
         this.toast(`Operation failed: ${(e as Error).message}`, 'error');
@@ -412,7 +420,10 @@ export function createRecordMethods(_state: AppState) {
           await this.loadZones(null, false);
         } else {
           const err = await response.json();
-          this.toast(`Delete failed: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`, 'error');
+          this.toast(
+            `Delete failed: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`,
+            'error',
+          );
         }
       } catch (e) {
         this.toast(`Delete failed: ${(e as Error).message}`, 'error');

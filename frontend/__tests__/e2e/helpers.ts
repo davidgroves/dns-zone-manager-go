@@ -23,7 +23,9 @@ export async function ensureLoggedIn(page: Page): Promise<void> {
   await page.goto('/');
 
   if (!(await backendRequiresLogin(page))) {
-    await expect(page.locator('.app-container')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.app-container')).toBeVisible({
+      timeout: 15000,
+    });
     await expect(page.locator('.zone-item').first()).toBeVisible({
       timeout: 30000,
     });

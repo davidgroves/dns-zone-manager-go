@@ -20,7 +20,9 @@ test.describe('Search', () => {
     await expect(page.locator('.card table tbody tr').first()).toBeVisible({
       timeout: 15000,
     });
-    const text = (await page.locator('.card table tbody').innerText()).toLowerCase();
+    const text = (
+      await page.locator('.card table tbody').innerText()
+    ).toLowerCase();
     expect(text).toContain('www');
   });
 
@@ -32,13 +34,17 @@ test.describe('Search', () => {
     });
     await input.clear();
     // Leaving search mode returns to the selected zone's records table
-    await expect(page.locator('.card-header button:has-text("Add Record")')).toBeVisible({
+    await expect(
+      page.locator('.card-header button:has-text("Add Record")'),
+    ).toBeVisible({
       timeout: 15000,
     });
     await expect(page.locator('.card table tbody tr').first()).toBeVisible();
   });
 
-  test('should filter by record type without search query', async ({ page }) => {
+  test('should filter by record type without search query', async ({
+    page,
+  }) => {
     // The type filter sits next to the search box
     const select = page.locator('header select').last();
     await expect(select).toBeVisible({ timeout: 10000 });

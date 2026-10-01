@@ -133,10 +133,7 @@ describe('formatDNSError', () => {
 
   it('joins top-level errors[].message', () => {
     const error = {
-      errors: [
-        { message: 'name is required' },
-        { message: 'type is invalid' },
-      ],
+      errors: [{ message: 'name is required' }, { message: 'type is invalid' }],
     };
     expect(formatDNSError(error)).toBe('name is required; type is invalid');
   });
@@ -221,9 +218,9 @@ describe('formatDNSError', () => {
 
 describe('formatDNSErrorWithRequestID', () => {
   it('appends request id when present', () => {
-    expect(
-      formatDNSErrorWithRequestID({ detail: 'boom' }, 'req-1'),
-    ).toBe('boom (req-1)');
+    expect(formatDNSErrorWithRequestID({ detail: 'boom' }, 'req-1')).toBe(
+      'boom (req-1)',
+    );
   });
 
   it('omits request id when absent', () => {

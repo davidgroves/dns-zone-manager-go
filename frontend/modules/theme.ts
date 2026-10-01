@@ -104,9 +104,7 @@ function injectOverrideCss(css: string): void {
 
 function systemPrefersDark(): boolean {
   try {
-    const media = globalThis.matchMedia?.(
-      '(prefers-color-scheme: dark)',
-    );
+    const media = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
     return media?.matches ?? true;
   } catch {
     return true;
@@ -158,7 +156,10 @@ export function applyCachedTheme(): ResolvedThemeMode {
  */
 export function createThemeMethods(_state: AppState) {
   return {
-    applyThemeFromConfig(this: ThemeMethodContext, theme: ThemeConfig | undefined) {
+    applyThemeFromConfig(
+      this: ThemeMethodContext,
+      theme: ThemeConfig | undefined,
+    ) {
       const payload: ThemeConfig = theme ?? {
         appName: 'DNS Zone Editor',
         defaultMode: 'dark',

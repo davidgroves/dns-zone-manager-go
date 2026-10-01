@@ -1,4 +1,9 @@
-import { API_BASE, api, formatDNSErrorWithRequestID, requestIDFromResponse } from '../api/client';
+import {
+  API_BASE,
+  api,
+  formatDNSErrorWithRequestID,
+  requestIDFromResponse,
+} from '../api/client';
 import type {
   AppState,
   RollbackPreview,
@@ -233,7 +238,10 @@ export function createHistoryMethods(_state: AppState) {
           }
         } else {
           const err = await response.json();
-          this.toast(`Rollback failed: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`, 'error');
+          this.toast(
+            `Rollback failed: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`,
+            'error',
+          );
         }
       } catch (e) {
         this.toast(`Rollback failed: ${(e as Error).message}`, 'error');

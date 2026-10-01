@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest';
 import {
   applyLiveOperations,
   compareRecords,
+  type LiveOperation,
   normalizeName,
   recordKey,
-  type LiveOperation,
 } from '../../modules/live';
 import type { RRset } from '../../types';
 

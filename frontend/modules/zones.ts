@@ -1,4 +1,9 @@
-import { API_BASE, api, formatDNSErrorWithRequestID, requestIDFromResponse } from '../api/client';
+import {
+  API_BASE,
+  api,
+  formatDNSErrorWithRequestID,
+  requestIDFromResponse,
+} from '../api/client';
 import type { AppState, CatalogStatus, PageSizeMode, Zone } from '../types';
 import { calculateZonePageSize, getPageSizeForMode } from '../utils/pagination';
 import { syncUrlFromState } from './router';
@@ -242,7 +247,10 @@ export function createZoneMethods(_state: AppState) {
           await this.loadZones();
         } else {
           const err = await response.json();
-          this.toast(`Catalog sync failed: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`, 'error');
+          this.toast(
+            `Catalog sync failed: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`,
+            'error',
+          );
         }
       } catch (e) {
         this.toast(`Catalog sync failed: ${(e as Error).message}`, 'error');
@@ -289,7 +297,10 @@ export function createZoneMethods(_state: AppState) {
           this.selectZone(zone);
         } else {
           const err = await response.json();
-          this.toast(`Failed to add zone: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`, 'error');
+          this.toast(
+            `Failed to add zone: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`,
+            'error',
+          );
         }
       } catch (e) {
         this.toast(`Failed to add zone: ${(e as Error).message}`, 'error');
@@ -392,7 +403,10 @@ export function createZoneMethods(_state: AppState) {
           this.toast('Zone exported successfully', 'success');
         } else {
           const err = await response.json();
-          this.toast(`Export failed: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`, 'error');
+          this.toast(
+            `Export failed: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`,
+            'error',
+          );
         }
       } catch (e) {
         this.toast(`Export failed: ${(e as Error).message}`, 'error');

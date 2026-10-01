@@ -1,4 +1,9 @@
-import { API_BASE, api, formatDNSErrorWithRequestID, requestIDFromResponse } from '../api/client';
+import {
+  API_BASE,
+  api,
+  formatDNSErrorWithRequestID,
+  requestIDFromResponse,
+} from '../api/client';
 import type { AppState } from '../types';
 
 // Method context type - includes state and other methods
@@ -107,7 +112,10 @@ export function createAtomicMethods(_state: AppState) {
           }
           await this.loadZones();
         } else {
-          const errorMsg = formatDNSErrorWithRequestID(data, requestIDFromResponse(response));
+          const errorMsg = formatDNSErrorWithRequestID(
+            data,
+            requestIDFromResponse(response),
+          );
           this.atomicResult = { success: false, message: errorMsg };
           this.toast(`Atomic update failed: ${errorMsg}`, 'error');
         }

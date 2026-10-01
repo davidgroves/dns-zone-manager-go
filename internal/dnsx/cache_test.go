@@ -246,14 +246,20 @@ func TestCacheDebouncedSerialRefresh(t *testing.T) {
 	cache.UpdateCacheAfterAdd(origin, "www", 300, "A", "IN", []string{"192.0.2.10"})
 
 	deadline := time.Now().Add(500 * time.Millisecond)
+	var serial uint32
 	for time.Now().Before(deadline) {
 		cz := cache.PeekZone(origin)
-		if cz != nil && cz.Serial == 99 {
-			return
+		if cz != nil {
+			cz.mu.RLock()
+			serial = cz.Serial
+			cz.mu.RUnlock()
+			if serial == 99 {
+				return
+			}
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatalf("serial not refreshed, got %d", cache.PeekZone(origin).Serial)
+	t.Fatalf("serial not refreshed, got %d", serial)
 }
 
 func TestPrepareAddPrereqs(t *testing.T) {

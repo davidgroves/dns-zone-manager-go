@@ -103,7 +103,9 @@ function normaliseOperations(
  * Validate schedule-modal operations before save.
  * Returns an error message, or null when the list is usable.
  */
-export function validateScheduleOps(operations: AtomicOpInput[]): string | null {
+export function validateScheduleOps(
+  operations: AtomicOpInput[],
+): string | null {
   const named = operations.filter((op) => op.name.trim());
   if (named.length === 0) {
     return 'Add at least one operation with a name';
@@ -330,7 +332,11 @@ export function formatAuditDetail(event: {
   const detail = event.detail;
   if (!detail || typeof detail !== 'object') return '';
 
-  if (event.event === 'updated' && detail.changes && typeof detail.changes === 'object') {
+  if (
+    event.event === 'updated' &&
+    detail.changes &&
+    typeof detail.changes === 'object'
+  ) {
     const changes = detail.changes as Record<string, unknown>;
     const parts: string[] = [];
     for (const [key, value] of Object.entries(changes)) {

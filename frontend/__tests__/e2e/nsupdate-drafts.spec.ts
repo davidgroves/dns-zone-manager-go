@@ -20,7 +20,9 @@ update add ${unique}.example.com. 300 A 192.0.2.77
 send
 `;
     await page.locator('.modal-body textarea').fill(script);
-    await page.locator('.modal-footer button:has-text("Save as Draft(s)")').click();
+    await page
+      .locator('.modal-footer button:has-text("Save as Draft(s)")')
+      .click();
 
     await expect(page.locator('h2:has-text("Scheduled Changes")')).toBeVisible({
       timeout: 10000,
@@ -38,6 +40,8 @@ send
     await expect(page.locator('#scheduled-change-detail')).toBeVisible({
       timeout: 5000,
     });
-    await expect(page.locator('#scheduled-change-detail')).toContainText(unique);
+    await expect(page.locator('#scheduled-change-detail')).toContainText(
+      unique,
+    );
   });
 });

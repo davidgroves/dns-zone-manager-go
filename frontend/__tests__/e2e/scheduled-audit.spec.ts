@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { ensureLoggedIn } from './helpers';
 
 test.describe('Audit Logs', () => {
@@ -22,17 +22,23 @@ test.describe('Audit Logs', () => {
     await createDraft(page, unique);
 
     await page.locator('button[title="Scheduled Changes"]').click();
-    const row = page.locator('.scheduled-table tr', { hasText: `E2E ${unique}` });
+    const row = page.locator('.scheduled-table tr', {
+      hasText: `E2E ${unique}`,
+    });
     await expect(row).toBeVisible({ timeout: 10000 });
 
     await row.locator('button[title="Edit"]').click();
-    await expect(page.locator('h3:has-text("Edit Scheduled Change")')).toBeVisible({
+    await expect(
+      page.locator('h3:has-text("Edit Scheduled Change")'),
+    ).toBeVisible({
       timeout: 5000,
     });
     const renamed = `E2E ${unique}-renamed`;
     await page.locator('.modal-body input[type="text"]').first().fill(renamed);
     await page.locator('.modal-footer button:has-text("Save Changes")').click();
-    await expect(page.locator('h3:has-text("Edit Scheduled Change")')).toBeHidden({
+    await expect(
+      page.locator('h3:has-text("Edit Scheduled Change")'),
+    ).toBeHidden({
       timeout: 10000,
     });
 
@@ -44,7 +50,9 @@ test.describe('Audit Logs', () => {
     const auditTable = page.locator('#audit-events-table');
     await expect(auditTable).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.card-body.scheduled-view-body')).toBeVisible();
-    await expect(page.locator('.audit-pagination #audit-result-summary')).toContainText(/events?/);
+    await expect(
+      page.locator('.audit-pagination #audit-result-summary'),
+    ).toContainText(/events?/);
     // Pagination sits above the table (below filters).
     const filtersBox = await page.locator('.audit-filters').boundingBox();
     const paginationBox = await page.locator('.audit-pagination').boundingBox();
@@ -56,22 +64,33 @@ test.describe('Audit Logs', () => {
     expect(tableBox!.y).toBeGreaterThan(paginationBox!.y);
 
     // Search for the renamed change
-    await page.locator('.audit-filters input[placeholder="Search…"]').fill(renamed);
+    await page
+      .locator('.audit-filters input[placeholder="Search…"]')
+      .fill(renamed);
     await page.locator('.audit-filters button:has-text("Search")').click();
 
     const auditRow = auditTable.locator('tr', { hasText: renamed });
     await expect(auditRow.first()).toBeVisible({ timeout: 10000 });
-    await expect(auditTable.locator('tr', { hasText: 'updated' }).first()).toBeVisible();
-    await expect(page.locator('.audit-pagination #audit-result-summary')).toContainText(/events?/);
-    await expect(auditRow.first().locator('td').first()).not.toContainText('UTC');
+    await expect(
+      auditTable.locator('tr', { hasText: 'updated' }).first(),
+    ).toBeVisible();
+    await expect(
+      page.locator('.audit-pagination #audit-result-summary'),
+    ).toContainText(/events?/);
+    await expect(auditRow.first().locator('td').first()).not.toContainText(
+      'UTC',
+    );
 
     await auditRow.first().locator('button.btn-link').click();
     await expect(page.locator('h2:has-text("Scheduled Changes")')).toBeVisible({
       timeout: 5000,
     });
-    await expect(page.locator('#scheduled-change-detail h3')).toHaveText(renamed, {
-      timeout: 10000,
-    });
+    await expect(page.locator('#scheduled-change-detail h3')).toHaveText(
+      renamed,
+      {
+        timeout: 10000,
+      },
+    );
   });
 });
 
@@ -86,18 +105,30 @@ async function createDraft(page: Page, unique: string) {
   await expect(page.locator('.modal-backdrop')).toBeVisible({ timeout: 5000 });
 
   await page.locator('.modal-body input').first().fill(unique);
-  await page.locator('.modal-body textarea, .modal-body input').last().fill('192.0.2.88');
+  await page
+    .locator('.modal-body textarea, .modal-body input')
+    .last()
+    .fill('192.0.2.88');
   await page.locator('.modal-footer button.btn-success').click();
 
-  await expect(page.locator('.atomic-indicator')).toBeVisible({ timeout: 5000 });
-  await page.locator('.atomic-indicator').click();
-  await page.locator('button:has-text("Save as Change")').click();
-  await expect(page.locator('h3:has-text("Save as Scheduled Change")')).toBeVisible({
+  await expect(page.locator('.atomic-indicator')).toBeVisible({
     timeout: 5000,
   });
-  await page.locator('.modal-body input[type="text"]').first().fill(`E2E ${unique}`);
+  await page.locator('.atomic-indicator').click();
+  await page.locator('button:has-text("Save as Change")').click();
+  await expect(
+    page.locator('h3:has-text("Save as Scheduled Change")'),
+  ).toBeVisible({
+    timeout: 5000,
+  });
+  await page
+    .locator('.modal-body input[type="text"]')
+    .first()
+    .fill(`E2E ${unique}`);
   await page.locator('.modal-footer button:has-text("Save Change")').click();
-  await expect(page.locator('h3:has-text("Save as Scheduled Change")')).toBeHidden({
+  await expect(
+    page.locator('h3:has-text("Save as Scheduled Change")'),
+  ).toBeHidden({
     timeout: 10000,
   });
 }

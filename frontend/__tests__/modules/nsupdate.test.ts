@@ -3,7 +3,9 @@ import { createNsupdateMethods } from '../../modules/nsupdate';
 import { createInitialState } from '../../state';
 import type { AppState, ScheduledChange } from '../../types';
 
-function draftChange(overrides: Partial<ScheduledChange> = {}): ScheduledChange {
+function draftChange(
+  overrides: Partial<ScheduledChange> = {},
+): ScheduledChange {
   return {
     id: 'draft-1',
     name: 'NSUPDATE · example.com · 20300615T123000Z',
@@ -88,8 +90,7 @@ describe('saveNsupdateAsDrafts', () => {
 
     const harness = makeCtx({
       apiKey: 'test-key',
-      nsupdateText:
-        'zone example.com.\nupdate add www 300 A 192.0.2.1\nsend\n',
+      nsupdateText: 'zone example.com.\nupdate add www 300 A 192.0.2.1\nsend\n',
       showNsupdate: true,
     });
     const { ctx, toasts } = harness;
@@ -123,7 +124,7 @@ describe('saveNsupdateAsDrafts', () => {
         ok: false,
         json: async () => ({
           detail:
-            "update delete without a record type cannot be saved as a scheduled change; specify the type",
+            'update delete without a record type cannot be saved as a scheduled change; specify the type',
         }),
       })),
     );

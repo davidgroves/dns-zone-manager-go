@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createSortingComputed, createSortingMethods } from '../../modules/sorting';
+import {
+  createSortingComputed,
+  createSortingMethods,
+} from '../../modules/sorting';
 import type { AppState, RRset } from '../../types';
 
 function makeState(overrides: Partial<AppState> = {}): AppState {
@@ -81,7 +84,9 @@ describe('createSortingComputed.filteredRecords', () => {
       sortDirection: 'asc',
     });
     const computed = createSortingComputed(state);
-    const data = computed.filteredRecords.map((r) => r.records[0].toLowerCase());
+    const data = computed.filteredRecords.map((r) =>
+      r.records[0].toLowerCase(),
+    );
     expect(data).toEqual(['"hello"', '192.0.2.3', '2001:db8::1'].sort());
   });
 

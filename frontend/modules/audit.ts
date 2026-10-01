@@ -1,4 +1,9 @@
-import { API_BASE, api, formatDNSErrorWithRequestID, requestIDFromResponse } from '../api/client';
+import {
+  API_BASE,
+  api,
+  formatDNSErrorWithRequestID,
+  requestIDFromResponse,
+} from '../api/client';
 import type { AppState, AuditEvent } from '../types';
 import { formatAuditDetail, formatLocalDisplay } from './scheduledHelpers';
 
@@ -68,7 +73,10 @@ export function createAuditMethods(_state: AppState) {
         return 'No events';
       }
       const from = this.auditOffset + 1;
-      const to = Math.min(this.auditOffset + this.auditEvents.length, this.auditTotal);
+      const to = Math.min(
+        this.auditOffset + this.auditEvents.length,
+        this.auditTotal,
+      );
       const noun = this.auditTotal === 1 ? 'event' : 'events';
       if (from === 1 && to === this.auditTotal) {
         return `${this.auditTotal} ${noun}`;
@@ -140,14 +148,20 @@ export function createAuditMethods(_state: AppState) {
         );
         if (!response.ok) {
           const data = await response.json();
-          this.toast(`Failed to load audit log: ${formatDNSErrorWithRequestID(data, requestIDFromResponse(response))}`, 'error');
+          this.toast(
+            `Failed to load audit log: ${formatDNSErrorWithRequestID(data, requestIDFromResponse(response))}`,
+            'error',
+          );
           return;
         }
         const data = await response.json();
         this.auditEvents = (data.events || []) as AuditEvent[];
         this.auditTotal = data.total || 0;
       } catch (e) {
-        this.toast(`Failed to load audit log: ${(e as Error).message}`, 'error');
+        this.toast(
+          `Failed to load audit log: ${(e as Error).message}`,
+          'error',
+        );
       } finally {
         this.auditLoading = false;
       }

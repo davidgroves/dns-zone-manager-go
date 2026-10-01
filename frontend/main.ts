@@ -26,6 +26,6 @@ window.createDnsApp = createDnsApp;
 // Start Alpine.js
 Alpine.start();
 
+export type { AppConfig } from './types';
 // Export for direct module usage
 export { createApp };
-export type { AppConfig } from './types';

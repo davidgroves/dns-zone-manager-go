@@ -28,7 +28,9 @@ test.describe('Zone Management', () => {
 
     // Clear restores the full list
     await page.locator('.zone-filter-clear').click();
-    await expect(page.locator('.zone-item')).toHaveCount(before, { timeout: 5000 });
+    await expect(page.locator('.zone-item')).toHaveCount(before, {
+      timeout: 5000,
+    });
   });
 
   test('should select a zone and display records', async ({ page }) => {

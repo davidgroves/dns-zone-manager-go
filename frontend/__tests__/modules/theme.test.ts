@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  THEME_MODE_STORAGE_KEY,
-  THEME_STORAGE_KEY,
-  THEME_STYLE_ID,
   applyTheme,
   buildThemeCss,
   resolveMode,
+  THEME_MODE_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  THEME_STYLE_ID,
 } from '../../modules/theme';
 import type { ThemeConfig } from '../../types';
 

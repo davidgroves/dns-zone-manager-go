@@ -12,7 +12,13 @@ test.describe('Record Management', () => {
   });
 
   test('should display records table with headers', async ({ page }) => {
-    await expect(page.locator('.card table th:has-text("FQDN"), .card table th:has-text("Name")').first()).toBeVisible();
+    await expect(
+      page
+        .locator(
+          '.card table th:has-text("FQDN"), .card table th:has-text("Name")',
+        )
+        .first(),
+    ).toBeVisible();
     await expect(page.locator('.card table th:has-text("Type")')).toBeVisible();
     await expect(page.locator('.card table th:has-text("TTL")')).toBeVisible();
     await expect(page.locator('.card table th:has-text("Data")')).toBeVisible();
@@ -22,21 +28,31 @@ test.describe('Record Management', () => {
     const unique = `e2e-rec-${Date.now()}`;
 
     await page.locator('.card-header button:has-text("Add Record")').click();
-    await expect(page.locator('.modal-backdrop')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.modal-backdrop')).toBeVisible({
+      timeout: 5000,
+    });
 
     await page.locator('.modal-body input').first().fill(unique);
     await page.locator('.modal-body textarea').fill('192.0.2.200');
     await page.locator('.modal-footer button.btn-success').click();
 
-    await expect(page.locator('.modal-backdrop')).not.toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.modal-backdrop')).not.toBeVisible({
+      timeout: 15000,
+    });
     const row = page.locator('.card table tr', { hasText: unique });
     await expect(row).toBeVisible({ timeout: 15000 });
 
     await row.locator('button.btn-action-delete').click();
-    await expect(page.locator('h3:has-text("Delete Record")')).toBeVisible({ timeout: 5000 });
-    await page.locator('.modal-footer button.btn-danger:has-text("Delete")').click();
+    await expect(page.locator('h3:has-text("Delete Record")')).toBeVisible({
+      timeout: 5000,
+    });
+    await page
+      .locator('.modal-footer button.btn-danger:has-text("Delete")')
+      .click();
 
-    await expect(page.locator('.card table tr', { hasText: unique })).toHaveCount(0, {
+    await expect(
+      page.locator('.card table tr', { hasText: unique }),
+    ).toHaveCount(0, {
       timeout: 15000,
     });
   });
@@ -61,20 +77,27 @@ test.describe('Record Management', () => {
     await page.locator('button:has-text("Load History")').click();
     // Either history content or empty/full-axfr message appears
     await expect(
-      page.locator('.modal-body').filter({ hasText: /serial|history|AXFR|No history/i }),
+      page
+        .locator('.modal-body')
+        .filter({ hasText: /serial|history|AXFR|No history/i }),
     ).toBeVisible({ timeout: 15000 });
   });
 
   test('should trigger zone export download', async ({ page }) => {
     const downloadPromise = page.waitForEvent('download', { timeout: 15000 });
-    await page.locator('button[title="Export zone file"], button:has-text("Export")').first().click();
+    await page
+      .locator('button[title="Export zone file"], button:has-text("Export")')
+      .first()
+      .click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/\.|\.zone|example/i);
   });
 });
 
 test.describe('Atomic Apply Now', () => {
-  test('should apply queued ops immediately via atomic endpoint', async ({ page }) => {
+  test('should apply queued ops immediately via atomic endpoint', async ({
+    page,
+  }) => {
     await ensureLoggedIn(page);
     await selectFirstZone(page);
 
@@ -84,19 +107,27 @@ test.describe('Atomic Apply Now', () => {
     await expect(page.locator('button.atomic-toggle.active')).toBeVisible();
 
     await page.locator('.card-header button:has-text("Add Record")').click();
-    await expect(page.locator('.modal-backdrop')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.modal-backdrop')).toBeVisible({
+      timeout: 5000,
+    });
     await page.locator('.modal-body input').first().fill(unique);
     await page.locator('.modal-body textarea').fill('192.0.2.201');
     await page.locator('.modal-footer button.btn-success').click();
 
-    await expect(page.locator('.atomic-indicator')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.atomic-indicator')).toBeVisible({
+      timeout: 5000,
+    });
     await page.locator('.atomic-indicator').click();
     await page.locator('.modal-footer button:has-text("Apply Now")').click();
 
     // Queue clears on success; dismiss the now-empty atomic modal
-    await expect(page.locator('.atomic-indicator')).toHaveCount(0, { timeout: 15000 });
+    await expect(page.locator('.atomic-indicator')).toHaveCount(0, {
+      timeout: 15000,
+    });
     await page.locator('.modal-backdrop .modal-header button').first().click();
-    await expect(page.locator('.modal-backdrop')).toHaveCount(0, { timeout: 5000 });
+    await expect(page.locator('.modal-backdrop')).toHaveCount(0, {
+      timeout: 5000,
+    });
 
     // Leave atomic mode so subsequent cleanup uses live delete
     const atomicToggle = page.locator('button.atomic-toggle.active');
@@ -104,14 +135,19 @@ test.describe('Atomic Apply Now', () => {
       await atomicToggle.click();
     }
 
-    await expect(page.locator('.card table tr', { hasText: unique })).toBeVisible({
+    await expect(
+      page.locator('.card table tr', { hasText: unique }),
+    ).toBeVisible({
       timeout: 15000,
     });
 
     // Cleanup
-    await page.locator('.card table tr', { hasText: unique })
+    await page
+      .locator('.card table tr', { hasText: unique })
       .locator('button.btn-action-delete')
       .click();
-    await page.locator('.modal-footer button.btn-danger:has-text("Delete")').click();
+    await page
+      .locator('.modal-footer button.btn-danger:has-text("Delete")')
+      .click();
   });
 });

@@ -7,8 +7,12 @@ describe('auth storage', () => {
   const session: Record<string, string> = {};
 
   beforeEach(() => {
-    Object.keys(store).forEach((k) => delete store[k]);
-    Object.keys(session).forEach((k) => delete session[k]);
+    for (const k of Object.keys(store)) {
+      delete store[k];
+    }
+    for (const k of Object.keys(session)) {
+      delete session[k];
+    }
     vi.stubGlobal('localStorage', {
       getItem: (k: string) => store[k] ?? null,
       setItem: (k: string, v: string) => {

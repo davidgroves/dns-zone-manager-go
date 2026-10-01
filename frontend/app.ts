@@ -15,16 +15,16 @@ import { createRouterMethods, parseUrlParams } from './modules/router';
 import { createScheduledMethods } from './modules/scheduled';
 import { createSearchMethods } from './modules/search';
 import { createSortingMethods } from './modules/sorting';
-import { createToastMethods } from './modules/toast';
 import { createThemeMethods } from './modules/theme';
+import { createToastMethods } from './modules/toast';
 import { createZoneMethods } from './modules/zones';
 import { createInitialState } from './state';
 import type {
   AppConfig,
   AppState,
   FlattenedSearchResult,
-  RRset,
   RouteParams,
+  RRset,
   Zone,
 } from './types';
 import {
@@ -71,7 +71,9 @@ type AlpineThis = AppState & {
   loadZones: () => Promise<void>;
   navigateToRoute: (route: RouteParams) => Promise<void>;
   updateUrlFromState: () => void;
-  applyThemeFromConfig: (theme: import('./types').ThemeConfig | undefined) => void;
+  applyThemeFromConfig: (
+    theme: import('./types').ThemeConfig | undefined,
+  ) => void;
   // Utility functions
   getPageSizeForMode: typeof getPageSizeForMode;
 };
@@ -443,7 +445,8 @@ export function createApp(config: AppConfig) {
       const storedKey = readStoredApiKey();
       if (storedKey) {
         self.apiKey = storedKey;
-        self.rememberApiKey = localStorage.getItem('dns_zone_manager_api_key') === storedKey;
+        self.rememberApiKey =
+          localStorage.getItem('dns_zone_manager_api_key') === storedKey;
         // validateAndSetAuth will call navigateToRoute if successful
         await self.validateAndSetAuth();
       }

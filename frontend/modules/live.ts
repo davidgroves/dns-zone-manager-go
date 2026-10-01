@@ -31,7 +31,11 @@ export function normalizeName(name: string): string {
   return n.endsWith('.') ? n : `${n}.`;
 }
 
-export function recordKey(name: string, type: string, rdclass?: string): string {
+export function recordKey(
+  name: string,
+  type: string,
+  rdclass?: string,
+): string {
   return `${normalizeName(name)}|${type.toUpperCase()}|${(rdclass || 'IN').toUpperCase()}`;
 }
 
@@ -92,7 +96,8 @@ export function applyLiveOperations(
   let records = [...ctx.records];
   let totalRecords = ctx.totalRecords;
   const flashedKeys: string[] = [];
-  const pageSize = ctx.pageSize && ctx.pageSize > 0 ? ctx.pageSize : records.length || 25;
+  const pageSize =
+    ctx.pageSize && ctx.pageSize > 0 ? ctx.pageSize : records.length || 25;
   const isFirstPage = (ctx.recordCursorHistory?.length ?? 0) === 0;
   const isLastPage = !ctx.hasMoreRecords;
 
@@ -123,13 +128,15 @@ export function applyLiveOperations(
         totalRecords += 1;
       }
 
-      if (!wouldFitOnPage(records, next, {
-        pageSize,
-        isFirstPage,
-        isLastPage,
-        sortField: ctx.sortField,
-        sortDirection: ctx.sortDirection,
-      })) {
+      if (
+        !wouldFitOnPage(records, next, {
+          pageSize,
+          isFirstPage,
+          isLastPage,
+          sortField: ctx.sortField,
+          sortDirection: ctx.sortDirection,
+        })
+      ) {
         continue;
       }
 
@@ -171,8 +178,18 @@ function wouldFitOnPage(
   );
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
-  const vsFirst = compareRecords(candidate, first, opts.sortField, opts.sortDirection);
-  const vsLast = compareRecords(candidate, last, opts.sortField, opts.sortDirection);
+  const vsFirst = compareRecords(
+    candidate,
+    first,
+    opts.sortField,
+    opts.sortDirection,
+  );
+  const vsLast = compareRecords(
+    candidate,
+    last,
+    opts.sortField,
+    opts.sortDirection,
+  );
 
   const inClosedRange = vsFirst >= 0 && vsLast <= 0;
   if (inClosedRange) {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  URL_PARAMS,
   buildQueryString,
   parseSearchString,
+  URL_PARAMS,
 } from '../../modules/router';
 
 describe('URL_PARAMS', () => {
@@ -168,9 +168,7 @@ describe('parseSearchString', () => {
   });
 
   it('should parse scheduled change id', () => {
-    const params = parseSearchString(
-      '?view=scheduled&change=abc-123-def',
-    );
+    const params = parseSearchString('?view=scheduled&change=abc-123-def');
     expect(params.view).toBe('scheduled');
     expect(params.change).toBe('abc-123-def');
   });

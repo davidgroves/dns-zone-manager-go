@@ -23,13 +23,18 @@ test.describe('Authentication', () => {
       'Auth is enabled; login-screen tests cover that mode',
     );
     await page.goto('/');
-    await expect(page.locator('.app-container')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.app-container')).toBeVisible({
+      timeout: 15000,
+    });
     await expect(page.locator('.login-container')).toHaveCount(0);
     await expect(page.locator('button[title="Logout"]')).toHaveCount(0);
   });
 
   test('should show login screen when not authenticated', async ({ page }) => {
-    test.skip(!(await backendRequiresLogin(page)), 'Auth disabled in this environment');
+    test.skip(
+      !(await backendRequiresLogin(page)),
+      'Auth disabled in this environment',
+    );
     await page.goto('/');
 
     await expect(page.locator('.login-container')).toBeVisible();
@@ -43,7 +48,10 @@ test.describe('Authentication', () => {
   });
 
   test('should show error for invalid API key', async ({ page }) => {
-    test.skip(!(await backendRequiresLogin(page)), 'Auth disabled in this environment');
+    test.skip(
+      !(await backendRequiresLogin(page)),
+      'Auth disabled in this environment',
+    );
     await page.goto('/');
 
     await page
@@ -55,7 +63,10 @@ test.describe('Authentication', () => {
   });
 
   test('should authenticate with valid API key', async ({ page }) => {
-    test.skip(!(await backendRequiresLogin(page)), 'Auth disabled in this environment');
+    test.skip(
+      !(await backendRequiresLogin(page)),
+      'Auth disabled in this environment',
+    );
     await page.goto('/');
 
     await page
@@ -70,7 +81,10 @@ test.describe('Authentication', () => {
   });
 
   test('should allow login via Enter key', async ({ page }) => {
-    test.skip(!(await backendRequiresLogin(page)), 'Auth disabled in this environment');
+    test.skip(
+      !(await backendRequiresLogin(page)),
+      'Auth disabled in this environment',
+    );
     await page.goto('/');
 
     const input = page.locator('input[placeholder="Enter your API key"]');
@@ -91,7 +105,10 @@ test.describe('Authentication', () => {
   });
 
   test('should allow logout', async ({ page }) => {
-    test.skip(!(await backendRequiresLogin(page)), 'Auth disabled in this environment');
+    test.skip(
+      !(await backendRequiresLogin(page)),
+      'Auth disabled in this environment',
+    );
     await ensureLoggedIn(page);
 
     await page.locator('button[title="Logout"]').click();

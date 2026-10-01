@@ -61,10 +61,7 @@ export function createNsupdateMethods(_state: AppState) {
           );
         }
       } catch (e) {
-        this.toast(
-          `NSUPDATE drafts failed: ${(e as Error).message}`,
-          'error',
-        );
+        this.toast(`NSUPDATE drafts failed: ${(e as Error).message}`, 'error');
       }
 
       this.saving = false;

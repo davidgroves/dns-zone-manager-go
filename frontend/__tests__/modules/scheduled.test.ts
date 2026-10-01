@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { createScheduledMethods } from '../../modules/scheduled';
 import {
   blankScheduleOp,
   buildCreatePayload,
   buildUpdatePayload,
   canRevertChange,
-  formFromChange,
   formatAuditDetail,
   formatLocalDisplay,
   formatScheduledDisplay,
+  formFromChange,
   localDatetimeToUtcIso,
   parseRecordsText,
   sourceBadgeClass,
@@ -15,7 +16,6 @@ import {
   utcIsoToLocalDatetime,
   validateScheduleOps,
 } from '../../modules/scheduledHelpers';
-import { createScheduledMethods } from '../../modules/scheduled';
 import { createInitialState } from '../../state';
 import type { AppState } from '../../types';
 
@@ -127,9 +127,9 @@ describe('buildCreatePayload', () => {
     expect(payload.not_valid_after).toMatch(/Z$/);
     expect(payload.auto_prerequisites).toBe(false);
     expect(payload.prerequisites).toHaveLength(1);
-    expect((payload.prerequisites as Array<Record<string, string>>)[0].prereq_type).toBe(
-      'nxrrset',
-    );
+    expect(
+      (payload.prerequisites as Array<Record<string, string>>)[0].prereq_type,
+    ).toBe('nxrrset');
 
     const scheduled = new Date(payload.scheduled_at as string).getTime();
     const expiry = new Date(payload.not_valid_after as string).getTime();
@@ -148,7 +148,15 @@ describe('buildCreatePayload', () => {
       },
       'example.com.',
       ops,
-      [{ prereq_type: 'nxdomain', name: '  ', rdtype: '', rdclass: 'IN', data: '' }],
+      [
+        {
+          prereq_type: 'nxdomain',
+          name: '  ',
+          rdtype: '',
+          rdclass: 'IN',
+          data: '',
+        },
+      ],
     );
     expect(payload.prerequisites).toEqual([]);
   });
@@ -212,7 +220,15 @@ describe('buildUpdatePayload', () => {
         autoPrerequisites: false,
       },
       [ops[0], { action: 'delete', name: 'old', type: 'A', records: null }],
-      [{ prereq_type: 'yxrrset', name: 'www', rdtype: 'A', rdclass: 'IN', data: '192.0.2.9' }],
+      [
+        {
+          prereq_type: 'yxrrset',
+          name: 'www',
+          rdtype: 'A',
+          rdclass: 'IN',
+          data: '192.0.2.9',
+        },
+      ],
     );
 
     expect(payload.operations).toHaveLength(2);
@@ -221,7 +237,9 @@ describe('buildUpdatePayload', () => {
     expect(operations[1].rdclass).toBe('IN');
     expect(operations[1].ttl).toBe(3600);
 
-    const prerequisites = payload.prerequisites as Array<Record<string, unknown>>;
+    const prerequisites = payload.prerequisites as Array<
+      Record<string, unknown>
+    >;
     expect(prerequisites[0].data).toBe('192.0.2.9');
 
     const scheduled = new Date(payload.scheduled_at as string).getTime();
@@ -256,7 +274,9 @@ describe('formFromChange', () => {
     expect(form.applyNow).toBe(false);
     expect(form.expiryHours).toBe(6);
     expect(form.autoPrerequisites).toBe(false);
-    expect(form.scheduledLocal).toBe(utcIsoToLocalDatetime('2030-06-15T14:30:00.000Z'));
+    expect(form.scheduledLocal).toBe(
+      utcIsoToLocalDatetime('2030-06-15T14:30:00.000Z'),
+    );
   });
 
   it('round-trips through buildUpdatePayload without drifting', () => {
@@ -704,6 +724,10 @@ describe('setScheduledSourceFilter', () => {
 
     ctx.setScheduledSourceFilter('scheduler');
 
-    expect(ctx.scheduledStatusFilters).toEqual(['draft', 'scheduled', 'failed']);
+    expect(ctx.scheduledStatusFilters).toEqual([
+      'draft',
+      'scheduled',
+      'failed',
+    ]);
   });
 });

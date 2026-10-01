@@ -1,9 +1,14 @@
-import { API_BASE, api, formatDNSErrorWithRequestID, requestIDFromResponse } from '../api/client';
+import {
+  API_BASE,
+  api,
+  formatDNSErrorWithRequestID,
+  requestIDFromResponse,
+} from '../api/client';
 import type {
   AppState,
   AtomicOperation,
-  RRset,
   ReversePtrCheckResult,
+  RRset,
 } from '../types';
 
 // Method context type

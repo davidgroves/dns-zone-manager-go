@@ -78,7 +78,10 @@ export function formatDNSError(err: unknown): string {
     const detail = errObj.detail;
     if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
       const detailObj = detail as Record<string, unknown>;
-      if (detailObj.rcode_description != null && detailObj.rcode_description !== '') {
+      if (
+        detailObj.rcode_description != null &&
+        detailObj.rcode_description !== ''
+      ) {
         return `${detailObj.rcode_description} (${detailObj.rcode})`;
       }
       if (detailObj.message != null && detailObj.message !== '') {
