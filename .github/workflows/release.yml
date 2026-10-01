@@ -39,9 +39,21 @@ jobs:
           VER="${GITHUB_REF_NAME#v}"
           npm pkg set version="$VER"
           npx tsc && npx vite build
+          # Version is already baked into the Vite build. Restore package.json
+          # so GoReleaser's clean-tree check still passes.
+          git checkout -- package.json
           rm -rf internal/ui/dist
           mkdir -p internal/ui/dist
           cp -a dist/. internal/ui/dist/
+          # The real SPA replaces the committed placeholder. It has to stay on
+          # disk for go:embed, but must not show up as a dirty tracked file.
+          git update-index --skip-worktree internal/ui/dist/index.html
+          dirty=$(git status --porcelain)
+          if [ -n "$dirty" ]; then
+            echo "git tree still dirty after frontend build:"
+            printf '%s\n' "$dirty"
+            exit 1
+          fi
 
       - uses: docker/login-action@v4
         with:
