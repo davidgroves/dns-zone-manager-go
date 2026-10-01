@@ -70,7 +70,9 @@ func (p *Pool) Exchange(ctx context.Context, msg *dns.Msg, tsigSecret map[string
 		return nil, err
 	}
 
-	resp, err := p.exchangeOn(ctx, pc, msg, tsigSecret)
+	// WriteMsg removes the TSIG RR from the message it signs. Copy so a
+	// retry, and the caller, still have a signature stub.
+	resp, err := p.exchangeOn(ctx, pc, msg.Copy(), tsigSecret)
 	if err == nil {
 		p.release(pc)
 		return resp, nil
@@ -82,7 +84,7 @@ func (p *Pool) Exchange(ctx context.Context, msg *dns.Msg, tsigSecret map[string
 	if err2 != nil {
 		return nil, fmt.Errorf("dns pool reconnect: %w (first error: %w)", err2, err)
 	}
-	resp, err = p.exchangeOn(ctx, pc2, msg, tsigSecret)
+	resp, err = p.exchangeOn(ctx, pc2, msg.Copy(), tsigSecret)
 	if err != nil {
 		p.discard(pc2)
 		return nil, err

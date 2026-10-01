@@ -35,15 +35,18 @@ tests/integration/      # //go:build integration
 ## Local loop
 
 ```bash
-# Terminal A — API (reload yourself or use air if you prefer)
-go run ./cmd/dns-zone-manager serve --config examples/config.yaml
-
-# Terminal B — Vite proxy to :8000
-npm run dev
+# Build the SPA, then serve API + UI from that directory on :8000
+npx tsc && npx vite build
+go run ./cmd/dns-zone-manager serve --config examples/config.yaml --ui-dir dist
 ```
 
-Vite proxies `/v1`, `/health`, `/ui/*` to the Go server. For production-like
-embeds: `make frontend-build` then run the binary alone.
+Open http://localhost:8000. Browsers receive the SPA; clients that do not send
+`Accept: text/html` still get the API info document at `/`.
+
+`--ui-dir` reads the Vite build at runtime. Omit it to serve the assets
+embedded in the binary (`make frontend-build`, which is what the container
+image does). `npm run dev` (Vite on :5173) is optional for hot reload. The
+devcontainer **Run All** task does not start it.
 
 ## Tests
 
@@ -55,6 +58,7 @@ npm run test
 npm run typecheck
 ./tests.sh
 ./tests.sh --all
+./tests.sh --report test-report.pdf   # same run, plus a PDF summary
 ```
 
 ## OpenAPI types
@@ -74,6 +78,25 @@ docker run --rm -p 8000:8000 -v "$PWD/config.yaml:/config.yaml:ro" \
 ```
 
 Distroless runtime: probe `/health` from the orchestrator (no curl in-image).
+Compose uses `dns-zone-manager healthcheck`, which GETs that URL and exits 0
+on HTTP 200.
+
+## Forked miekg/dns
+
+`go.mod` replaces `github.com/miekg/dns` with
+[davidgroves/dns](https://github.com/davidgroves/dns) branch
+`fix/tcp-tsig-response-mac` (commit `537ba7e9`).
+
+miekg v1.1.63 does not chain the TSIG MAC across messages on one TCP
+connection. BIND requires that chain, so the second signed update on a
+pooled connection was `BADSIG`. The pool treated that as a broken socket
+and closed it, so each connection carried one successful DDNS update and
+then one failure. The retry of the failed update had already had its TSIG
+record removed by signing, so it was sent unsigned and BIND refused it.
+Half of a sustained run failed.
+
+Drop the `replace` once the fix is in an upstream release and this module
+requires that version.
 
 ## Migrations
 

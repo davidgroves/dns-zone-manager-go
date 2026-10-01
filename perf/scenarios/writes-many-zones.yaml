@@ -1,0 +1,40 @@
+name: writes-many-zones
+description: 500 API changes/s for 30s, round-robin across the 25 small catalog zones.
+zone: alpha.test
+provision: false
+require_zone: true
+load:
+  mode: api
+  concurrency: 32
+  pool_size: 2000
+  readers: false
+  zones:
+    - alpha.test
+    - beta.test
+    - gamma.test
+    - delta.test
+    - epsilon.test
+    - zeta.test
+    - eta.test
+    - theta.test
+    - iota.test
+    - kappa.test
+    - lambda.test
+    - mu.test
+    - nu.test
+    - xi.test
+    - omicron.test
+    - pi.test
+    - rho.test
+    - sigma.test
+    - tau.test
+    - upsilon.test
+    - phi.test
+    - chi.test
+    - psi.test
+    - omega.test
+    - final.test
+  steps:
+    - { rps: 500, duration: 30, label: "many-zones@500" }
+notes:
+  - Same rate and record shape as writes-one-zone. Each change goes to the next zone.

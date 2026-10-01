@@ -10,9 +10,12 @@
       "args": [
         "serve",
         "--config",
-        "${workspaceFolder}/.devcontainer/config.devcontainer.yaml"
+        "${workspaceFolder}/.devcontainer/config.devcontainer.yaml",
+        "--ui-dir",
+        "${workspaceFolder}/dist"
       ],
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Build SPA"
     }
   ]
 }

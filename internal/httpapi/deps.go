@@ -39,6 +39,11 @@ type Deps struct {
 	Notify   NotifyStatusProvider
 	Emitter  *notifications.EventEmitter
 
+	// UIDir, when set, serves SPA files from this directory instead of the
+	// assets embedded at build time. Used by local dev so `go run` can serve
+	// a Vite build without rewriting internal/ui/dist.
+	UIDir string
+
 	// Optional hooks used by tests / readiness.
 	DNSReady   func(ctx context.Context) bool
 	StoreReady func(ctx context.Context) bool

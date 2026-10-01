@@ -2,9 +2,21 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Build SPA",
+      "type": "shell",
+      "command": "npx tsc && npx vite build",
+      "group": "build",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "BACKEND",
       "type": "shell",
-      "command": "go run ./cmd/dns-zone-manager serve --config .devcontainer/config.devcontainer.yaml",
+      "command": "go run ./cmd/dns-zone-manager serve --config .devcontainer/config.devcontainer.yaml --ui-dir dist",
+      "dependsOn": ["Build SPA"],
       "group": "build",
       "presentation": {
         "reveal": "always",
@@ -19,7 +31,8 @@
     {
       "label": "BACKEND (Local)",
       "type": "shell",
-      "command": "go run ./cmd/dns-zone-manager serve --config examples/config.yaml",
+      "command": "go run ./cmd/dns-zone-manager serve --config examples/config.yaml --ui-dir dist",
+      "dependsOn": ["Build SPA"],
       "group": "build",
       "presentation": {
         "reveal": "always",
@@ -29,10 +42,9 @@
       "problemMatcher": []
     },
     {
-      "label": "FRONTEND",
+      "label": "Vite (optional)",
       "type": "shell",
       "command": "npm run dev",
-      "group": "build",
       "presentation": {
         "reveal": "always",
         "panel": "dedicated"
@@ -114,7 +126,7 @@
     },
     {
       "label": "Run All",
-      "dependsOn": ["BACKEND", "FRONTEND", "BIND", "POSTGRES"],
+      "dependsOn": ["BACKEND", "BIND", "POSTGRES"],
       "dependsOrder": "parallel",
       "group": {
         "kind": "build",
@@ -123,14 +135,8 @@
       "problemMatcher": []
     },
     {
-      "label": "Start Frontend + BIND",
-      "dependsOn": ["FRONTEND", "BIND"],
-      "dependsOrder": "parallel",
-      "problemMatcher": []
-    },
-    {
       "label": "Run All (Local)",
-      "dependsOn": ["BACKEND (Local)", "FRONTEND"],
+      "dependsOn": ["BACKEND (Local)"],
       "dependsOrder": "parallel",
       "group": "build",
       "problemMatcher": []

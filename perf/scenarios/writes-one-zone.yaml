@@ -1,0 +1,14 @@
+name: writes-one-zone
+description: 500 API changes/s for 30s, all against one zone (test.local).
+zone: test.local
+provision: false
+require_zone: true
+load:
+  mode: api
+  concurrency: 32
+  pool_size: 2000
+  readers: false
+  steps:
+    - { rps: 500, duration: 30, label: "one-zone@500" }
+notes:
+  - Every change updates test.local. Compare with writes-many-zones.

@@ -7,6 +7,8 @@ build:
 	mkdir -p bin
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/dns-zone-manager ./cmd/dns-zone-manager
 	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/dns-cli ./cmd/dns-cli
+	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/dns-tests ./cmd/dns-tests
+	CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o bin/dns-perf ./cmd/dns-perf
 
 test:
 	go test ./...

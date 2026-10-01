@@ -8,7 +8,7 @@ export default defineConfig(({ command }) => {
     root: 'frontend',
     
     build: isServe ? {} : {
-      // SPA build for nginx/Docker deployment
+      // SPA build copied into internal/ui/dist and embedded in the binary
       outDir: resolve(__dirname, 'dist'),
       emptyOutDir: true,
     },
@@ -23,7 +23,7 @@ export default defineConfig(({ command }) => {
     server: {
       port: 5173,
       host: true,  // Bind to 0.0.0.0 for container/devcontainer access
-      // Proxy API requests to local FastAPI server
+      // Optional dev-server proxy to the Go API (not used when the binary serves the SPA)
       proxy: {
         '/ui/config': 'http://localhost:8000',
         '/ui/logo': 'http://localhost:8000',

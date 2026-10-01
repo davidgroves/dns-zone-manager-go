@@ -92,7 +92,7 @@ scheduler:
 # Add a target below to exercise real delivery.
 webhooks:
   enabled: false
-  base_url: http://localhost:5173
+  base_url: http://localhost:8000
   # targets:
   #   - name: local-sink
   #     type: generic

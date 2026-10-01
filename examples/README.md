@@ -29,7 +29,7 @@ docker compose logs -f
 
 | Service | Port | Description |
 |---------|------|-------------|
-| dns-zone-manager | 8000 | FastAPI DNS Management API |
+| dns-zone-manager | 8000 | HTTP API and embedded web UI |
 | dns-zone-manager | 5354 | Catalog Zone NOTIFY listener |
 | bind | 15353 | BIND 9 DNS Server |
 | bind | 15953 | BIND 9 RNDC control port |
@@ -41,7 +41,7 @@ docker compose logs -f
 
 ### Web UI
 
-The DNS Zone Editor web interface is available at:
+The `dns-zone-manager` container serves the API and the web UI on the same port. There is no separate frontend container.
 
 - **Web UI**: http://localhost:8000
 

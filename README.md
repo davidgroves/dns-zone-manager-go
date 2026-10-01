@@ -32,7 +32,7 @@ Open http://localhost:8000 — the binary serves `/health`, `/ready`, `/metrics`
 
 | Target | Description |
 |--------|-------------|
-| `make build` | Build `bin/dns-zone-manager` and `bin/dns-cli` |
+| `make build` | Build `bin/dns-zone-manager`, `bin/dns-cli`, `bin/dns-tests`, and `bin/dns-perf` |
 | `make test` | `go test ./…` |
 | `make test-race` | Race detector |
 | `make test-integration` | `go test -tags=integration ./tests/integration/…` |
@@ -46,6 +46,7 @@ Open http://localhost:8000 — the binary serves `/health`, `/ready`, `/metrics`
 ```bash
 ./tests.sh          # Go unit + npm vitest
 ./tests.sh --all    # + integration + Playwright when servers are up
+./tests.sh --report test-report.pdf
 ```
 
 ## Configuration

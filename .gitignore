@@ -42,7 +42,9 @@ tmp/
 .DS_Store
 
 # Perf results (local)
-perf/results/
+perf/results/*
+!perf/results/.gitkeep
 
 # Vite / TS
 *.tsbuildinfo
+

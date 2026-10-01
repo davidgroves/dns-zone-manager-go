@@ -33,7 +33,7 @@ func main() {
 		Short:   "DNS Zone Manager API server",
 		Version: version.Current(),
 	}
-	root.AddCommand(serveCmd())
+	root.AddCommand(serveCmd(), healthcheckCmd())
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -44,21 +44,23 @@ func serveCmd() *cobra.Command {
 		configPath string
 		host       string
 		port       int
+		uiDir      string
 	)
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start the HTTP API server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runServe(configPath, host, port)
+			return runServe(configPath, host, port, uiDir)
 		},
 	}
 	cmd.Flags().StringVar(&configPath, "config", "", "Path to YAML config file")
 	cmd.Flags().StringVar(&host, "host", "0.0.0.0", "Listen address")
 	cmd.Flags().IntVar(&port, "port", 8000, "Listen port")
+	cmd.Flags().StringVar(&uiDir, "ui-dir", "", "Serve SPA files from this directory instead of the embedded assets")
 	return cmd
 }
 
-func runServe(configPath, host string, port int) error {
+func runServe(configPath, host string, port int, uiDir string) error {
 	settings, err := config.Load(configPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -191,6 +193,7 @@ func runServe(configPath, host string, port int) error {
 
 	deps := httpapi.Deps{
 		Settings: settings,
+		UIDir:    uiDir,
 		Auth:     auth.NewCombined(settings),
 		Client:   client,
 		Cache:    cache,

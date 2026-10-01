@@ -1,7 +1,8 @@
 # Performance
 
-Opt-in harness under `perf/` (Python tooling, unchanged from the original
-project). The Go backend is the system under test.
+Opt-in harness under `perf/`. `./perf.sh` runs the Go command `dns-perf`.
+Each run writes JSON, Markdown, and a PDF in `perf/results/` (`latest.pdf`
+is the most recent). The Go backend is the system under test.
 
 ## Goals
 
@@ -10,6 +11,8 @@ limit. Measure with:
 
 ```bash
 ./perf.sh run rapid-api-writes
+./perf.sh run writes-one-zone     # 500/s, all changes in test.local
+./perf.sh run writes-many-zones   # 500/s, round-robin across 25 small zones
 ./perf.sh run rapid-ddns-writes   # baseline: BIND alone
 ./perf.sh run mixed-read-write
 ./perf.sh run websocket-fanout

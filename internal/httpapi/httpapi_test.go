@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -133,6 +135,59 @@ func doJSON(t *testing.T, h http.Handler, method, path string) (int, map[string]
 		_ = json.Unmarshal(b, &body)
 	}
 	return rr.Code, body, rr.Header()
+}
+
+func TestUIDirServesIndex(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>from-dir</html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	settings := testSettings()
+	h := httpapi.New(httpapi.Deps{
+		Settings:   settings,
+		Auth:       auth.NewCombined(settings),
+		UIDir:      dir,
+		DNSReady:   func(context.Context) bool { return true },
+		StoreReady: func(context.Context) bool { return true },
+	})
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept", "text/html")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "from-dir") {
+		t.Fatalf("body %q", rr.Body.String())
+	}
+}
+
+func TestRootBrowserGetsSPA(t *testing.T) {
+	h := testHandler(t)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status %d", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Fatalf("content-type %q", ct)
+	}
+	if !strings.Contains(rr.Body.String(), "<html") {
+		t.Fatalf("body %q", rr.Body.String())
+	}
+}
+
+func TestRootClientGetsAPIInfo(t *testing.T) {
+	h := testHandler(t)
+	code, body, _ := doJSON(t, h, http.MethodGet, "/")
+	if code != http.StatusOK {
+		t.Fatalf("status %d body=%v", code, body)
+	}
+	if body["health"] != "/health" {
+		t.Fatalf("body %v", body)
+	}
 }
 
 func TestHealth(t *testing.T) {

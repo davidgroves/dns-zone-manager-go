@@ -1,7 +1,7 @@
 [project]
 name = "dns-zone-manager-perf"
 version = "0.0.0"
-description = "Opt-in performance harness for DNS Zone Manager"
+description = "Retired. The performance harness is the Go command dns-perf (./perf.sh)."
 requires-python = ">=3.11"
 dependencies = [
   "httpx2>=2.13.0",

@@ -130,3 +130,55 @@ func serveDNSConn(c net.Conn) {
 		}
 	}
 }
+
+func TestPoolReusesTSIGConnection(t *testing.T) {
+	secret := map[string]string{dns.Fqdn("test"): "so6ZGir4GPAqINNh9U5c3A=="}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := &dns.Server{
+		Listener:   ln,
+		Net:        "tcp",
+		TsigSecret: secret,
+		Handler: dns.HandlerFunc(func(w dns.ResponseWriter, r *dns.Msg) {
+			m := new(dns.Msg)
+			m.SetReply(r)
+			if st := w.TsigStatus(); st != nil {
+				t.Errorf("TSIG: %v", st)
+				return
+			}
+			m.SetTsig(dns.Fqdn("test"), dns.HmacSHA256, 300, time.Now().Unix())
+			if err := w.WriteMsg(m); err != nil {
+				t.Errorf("write: %v", err)
+			}
+		}),
+	}
+	done := make(chan error, 1)
+	go func() { done <- srv.ActivateAndServe() }()
+	defer func() {
+		_ = srv.Shutdown()
+		<-done
+	}()
+
+	pool := NewPool(ln.Addr().String(), 1, time.Second, time.Second)
+	defer pool.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	for i := 0; i < 3; i++ {
+		msg := new(dns.Msg)
+		msg.SetQuestion("example.com.", dns.TypeA)
+		msg.SetTsig(dns.Fqdn("test"), dns.HmacSHA256, 300, time.Now().Unix())
+		resp, err := pool.Exchange(ctx, msg, secret)
+		if err != nil {
+			t.Fatalf("exchange %d: %v", i, err)
+		}
+		if resp.Rcode != dns.RcodeSuccess {
+			t.Fatalf("exchange %d rcode %s", i, dns.RcodeToString[resp.Rcode])
+		}
+		if msg.IsTsig() == nil {
+			t.Fatalf("exchange %d stripped the caller's TSIG", i)
+		}
+	}
+}

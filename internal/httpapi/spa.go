@@ -3,6 +3,7 @@ package httpapi
 import (
 	"io/fs"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/davidgroves/dns-zone-manager-go/internal/ui"
@@ -15,10 +16,16 @@ type spaFallback struct {
 	hasIndex bool
 }
 
-func newSPAFallback(api http.Handler) http.Handler {
-	sub, err := fs.Sub(ui.Dist, "dist")
-	if err != nil {
-		return api
+func newSPAFallback(api http.Handler, uiDir string) http.Handler {
+	var sub fs.FS
+	if uiDir != "" {
+		sub = os.DirFS(uiDir)
+	} else {
+		var err error
+		sub, err = fs.Sub(ui.Dist, "dist")
+		if err != nil {
+			return api
+		}
 	}
 	index, err := fs.ReadFile(sub, "index.html")
 	sf := &spaFallback{
@@ -32,6 +39,12 @@ func newSPAFallback(api http.Handler) http.Handler {
 
 func (s *spaFallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
+	// Browsers opening the site get the SPA. Clients that do not ask for
+	// HTML (curl, probes) still receive the API info document at /.
+	if (path == "/" || path == "") && s.hasIndex && prefersHTML(r) {
+		writeIndex(w, r, s.index)
+		return
+	}
 	// API / docs / health always go to the API mux.
 	if isAPIPath(path) {
 		s.api.ServeHTTP(w, r)
@@ -45,13 +58,26 @@ func (s *spaFallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		// SPA client-side route fallback.
 		if s.hasIndex {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(s.index)
+			writeIndex(w, r, s.index)
 			return
 		}
 	}
 	s.api.ServeHTTP(w, r)
+}
+
+func prefersHTML(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	return strings.Contains(r.Header.Get("Accept"), "text/html")
+}
+
+func writeIndex(w http.ResponseWriter, r *http.Request, index []byte) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	if r.Method != http.MethodHead {
+		_, _ = w.Write(index)
+	}
 }
 
 func isAPIPath(path string) bool {

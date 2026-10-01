@@ -48,7 +48,7 @@ func New(deps Deps) http.Handler {
 		slow = 1000
 	}
 
-	h := newSPAFallback(mux)
+	h := newSPAFallback(mux, deps.UIDir)
 	h = RequireAuth(deps.Auth)(h)
 	h = WideEvent(sample, slow)(h)
 	h = OriginCheck(deps.Settings.Server.CorsOrigins)(h)

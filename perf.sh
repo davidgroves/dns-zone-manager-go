@@ -6,7 +6,7 @@
 #   ./perf.sh zone destroy [--zone NAME] [--delete-file]
 #   ./perf.sh zone generate [--preset 100k] [--output PATH]
 #   ./perf.sh run <scenario|all> [--preset 100k]
-#   ./perf.sh report [path.json] [--compare A.json B.json]
+#   ./perf.sh report [path.json] [--pdf out.pdf] [--compare A.json B.json]
 #   ./perf.sh list
 #
 # Environment (same names as examples/always-changing/churn.sh):
@@ -27,4 +27,4 @@ export API_BASE="${API_BASE:-http://127.0.0.1:8000}"
 export BIND_HOST="${BIND_HOST:-bind}"
 export BIND_PORT="${BIND_PORT:-15353}"
 
-exec uv run python -m perf "$@"
+exec go run ./cmd/dns-perf "$@"

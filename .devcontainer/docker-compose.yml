@@ -30,8 +30,8 @@ services:
       - OTEL_SERVICE_NAME=dns-zone-manager
     # Expose ports directly (more reliable than VS Code forwardPorts on macOS)
     ports:
-      - "5173:5173"   # Vite frontend
-      - "8000:8000"   # Go backend
+      - "8000:8000"   # API and embedded web UI
+      - "5173:5173"   # optional Vite dev server (not started by default)
     # Enable host.docker.internal on Linux (automatic on Docker Desktop)
     extra_hosts:
       - "host.docker.internal:host-gateway"

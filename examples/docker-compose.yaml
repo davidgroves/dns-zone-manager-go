@@ -2,8 +2,7 @@
 # This docker-compose file sets up a complete environment with:
 # - BIND 9 DNS server with example zones
 # - PostgreSQL storing scheduled changes and the audit log
-# - FastAPI DNS management API (backend)
-# - Nginx serving the Vite frontend (proxies API calls to FastAPI)
+# - dns-zone-manager (one binary: HTTP API + embedded web UI)
 # - Grafana LGTM (Loki + Grafana + Tempo + Prometheus) for logs and metrics
 #
 # Usage:
@@ -120,7 +119,7 @@ services:
       start_period: 5s
     restart: unless-stopped
 
-  # FastAPI DNS Management API (backend)
+  # API and web UI. The image builds the SPA and embeds it in the binary.
   dns-zone-manager:
     build:
       context: ..
@@ -135,10 +134,9 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4318
       - OTEL_SERVICE_NAME=dns-zone-manager
     ports:
+      - "8000:8000"
       - "5354:5354/tcp"
       - "5354:5354/udp"
-    expose:
-      - "8000"
     networks:
       - dns-network
     depends_on:
@@ -146,29 +144,15 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    # Use dns-zone-manager CLI with config file
-    command: ["sh", "-c", "sleep 2 && dns-zone-manager --config /app/config.yaml --host 0.0.0.0 --port 8000"]
+    # ENTRYPOINT is /dns-zone-manager; command replaces the image CMD.
+    command: ["serve", "--config", "/app/config.yaml", "--host", "0.0.0.0", "--port", "8000"]
+    # Distroless has no curl. The healthcheck subcommand GETs /health.
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    restart: unless-stopped
-
-  # Frontend (nginx serving Vite build, proxies API to FastAPI)
-  frontend:
-    build:
-      context: ..
-      dockerfile: Dockerfile.frontend
-    container_name: dns-frontend
-    ports:
-      - "8000:8080"
-    networks:
-      - dns-network
-    depends_on:
-      dns-zone-manager:
-        condition: service_healthy
+      test: ["CMD", "/dns-zone-manager", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
     restart: unless-stopped
 
   # Opt-in continuous churn against always-changing.example (DDNS + API).
@@ -225,8 +209,8 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Opt-in performance harness runner (has dig/nsupdate/rndc/uv from the
-  # .devcontainer image). Example:
+  # Opt-in performance harness runner (Go dns-perf via ./perf.sh; the image
+  # also has rndc). Example:
   #   docker compose --profile perf run --rm perf-runner ./perf.sh list
   #   docker compose --profile perf run --rm perf-runner ./perf.sh zone create --preset 100k
   perf-runner:
