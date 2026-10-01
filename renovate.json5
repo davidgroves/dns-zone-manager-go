@@ -43,5 +43,12 @@
       matchPackageNames: ["internetsystemsconsortium/bind9"],
       allowedVersions: "<9.21",
     },
+    {
+      // The replace directive must stay on fix/tcp-tsig-response-mac.
+      // The fork default branch does not contain that fix.
+      matchManagers: ["gomod"],
+      matchPackageNames: ["github.com/miekg/dns", "github.com/davidgroves/dns"],
+      enabled: false,
+    },
   ],
 }
