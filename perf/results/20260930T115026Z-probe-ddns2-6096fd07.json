@@ -1,0 +1,222 @@
+{
+  "scenario": "probe-ddns2",
+  "started_at": "2026-09-30T11:49:58.966389+00:00",
+  "finished_at": "2026-09-30T11:50:26.700128+00:00",
+  "host": {
+    "platform": "Linux-7.2.7+deb14-amd64-x86_64-with-glibc2.36",
+    "python": "3.14.7",
+    "machine": "x86_64",
+    "processor": "",
+    "node": "ac310bcdbe5c"
+  },
+  "config": {
+    "zone": "perf5m.test",
+    "api_base": "http://127.0.0.1:8000",
+    "bind": "bind:15353",
+    "scenario_file": "probe-ddns2"
+  },
+  "steps": [
+    {
+      "label": "ddns@250",
+      "target_rps": 250.0,
+      "duration_seconds": 20.0,
+      "achieved_rps": 249.90919337049735,
+      "writers": {
+        "count": 5000,
+        "errors": 0,
+        "error_kinds": {},
+        "p50_ms": 2.1992779948050156,
+        "p95_ms": 2.6411510043544695,
+        "p99_ms": 2.8445130010368302,
+        "max_ms": 6.1402150022331625,
+        "mean_ms": 2.2009081376396353,
+        "min_ms": 1.4280369941843674,
+        "issued_tokens": 5000,
+        "wall_seconds": 20.007267169989063,
+        "mode": "ddns"
+      },
+      "readers": {},
+      "websocket": {}
+    }
+  ],
+  "provision": null,
+  "probes": {
+    "before": {
+      "api_base": "http://127.0.0.1:8000",
+      "bind_host": "bind",
+      "bind_port": 15353,
+      "docker_stats": {
+        "dns-zone-manager_devcontainer-bind-1": {
+          "cpu_perc": "0.00%",
+          "mem_usage": "248.5MiB / 93.6GiB",
+          "mem_perc": "0.26%"
+        },
+        "dns-zone-manager_devcontainer-lgtm-1": {
+          "cpu_perc": "3.31%",
+          "mem_usage": "991.6MiB / 93.6GiB",
+          "mem_perc": "1.03%"
+        },
+        "dns-zone-manager_devcontainer-dev-1": {
+          "cpu_perc": "45.90%",
+          "mem_usage": "3.686GiB / 93.6GiB",
+          "mem_perc": "3.94%"
+        },
+        "dns-zone-manager_devcontainer-postgres-1": {
+          "cpu_perc": "5.74%",
+          "mem_usage": "263.7MiB / 93.6GiB",
+          "mem_perc": "0.28%"
+        },
+        "dnssec-auditor_devcontainer-bind-1": {
+          "cpu_perc": "0.00%",
+          "mem_usage": "191MiB / 93.6GiB",
+          "mem_perc": "0.20%"
+        },
+        "dnssec-auditor-bind": {
+          "cpu_perc": "0.00%",
+          "mem_usage": "237.3MiB / 93.6GiB",
+          "mem_perc": "0.25%"
+        }
+      },
+      "metrics": {
+        "timestamp": 1790769002.4844675,
+        "values": {
+          "dns_zone_manager_rrset_replaces_total{zone=\"perf5m.test.\"}": 4942.0,
+          "dns_zone_manager_rrset_replaces_total": 4942.0,
+          "dns_zone_manager_rrset_replaces_created{zone=\"perf5m.test.\"}": 1790768968.1744587,
+          "dns_zone_manager_rrset_replaces_created": 1790768968.1744587,
+          "dns_zone_manager_ddns_updates_successful_total": 4942.0,
+          "dns_zone_manager_ddns_updates_successful_created": 1790768948.2351918,
+          "dns_zone_manager_zone_transfers_total{method=\"axfr\",zone=\"perf5m.test.\"}": 1.0,
+          "dns_zone_manager_zone_transfers_total": 1.0,
+          "dns_zone_manager_zone_transfers_created{method=\"axfr\",zone=\"perf5m.test.\"}": 1790768968.1085486,
+          "dns_zone_manager_zone_transfers_created": 1790768968.1085486,
+          "dns_zone_manager_notifies_received_total{transport=\"udp\",zone=\"perf5m.test.\"}": 2.0,
+          "dns_zone_manager_notifies_received_total": 2.0,
+          "dns_zone_manager_notifies_received_created{transport=\"udp\",zone=\"perf5m.test.\"}": 1790768952.3786104,
+          "dns_zone_manager_notifies_received_created": 1790768952.3786104,
+          "dns_zone_manager_cache_size_bytes": 36993849.0,
+          "dns_zone_manager_cache_evictions_total": 0.0,
+          "dns_zone_manager_webhook_queue_dropped_total": 3798.0,
+          "dns_zone_manager_webhook_queue_dropped_created": 1790768948.2353868,
+          "dns_zone_manager_webhook_queue_depth": 0.0,
+          "dns_zone_manager_webhook_autorecorded_changes_total{outcome=\"recorded\"}": 1144.0,
+          "dns_zone_manager_webhook_autorecorded_changes_total": 1144.0,
+          "dns_zone_manager_webhook_autorecorded_changes_created{outcome=\"recorded\"}": 1790768968.2071342,
+          "dns_zone_manager_webhook_autorecorded_changes_created": 1790768968.2071342,
+          "dns_zone_manager_zone_ws_send_errors_total": 0.0,
+          "dns_zone_manager_zone_ws_send_errors_created": 1790768948.235413,
+          "dns_zone_manager_zone_ws_slow_client_drops_total": 0.0,
+          "dns_zone_manager_zone_ws_slow_client_drops_created": 1790768948.2354214
+        }
+      },
+      "serial_lag": {
+        "bind_serial": 1790768994,
+        "app_serial": 1790768994,
+        "lag_seconds": 0.04671598300046753,
+        "timed_out": false,
+        "timeout_seconds": 30.0
+      },
+      "host": {
+        "cwd": "/workspace"
+      }
+    },
+    "after": {
+      "api_base": "http://127.0.0.1:8000",
+      "bind_host": "bind",
+      "bind_port": 15353,
+      "docker_stats": {
+        "dns-zone-manager_devcontainer-bind-1": {
+          "cpu_perc": "2.20%",
+          "mem_usage": "249.1MiB / 93.6GiB",
+          "mem_perc": "0.26%"
+        },
+        "dns-zone-manager_devcontainer-lgtm-1": {
+          "cpu_perc": "3.47%",
+          "mem_usage": "985MiB / 93.6GiB",
+          "mem_perc": "1.03%"
+        },
+        "dns-zone-manager_devcontainer-dev-1": {
+          "cpu_perc": "18.12%",
+          "mem_usage": "3.691GiB / 93.6GiB",
+          "mem_perc": "3.94%"
+        },
+        "dns-zone-manager_devcontainer-postgres-1": {
+          "cpu_perc": "0.00%",
+          "mem_usage": "262.4MiB / 93.6GiB",
+          "mem_perc": "0.27%"
+        },
+        "dnssec-auditor_devcontainer-bind-1": {
+          "cpu_perc": "0.00%",
+          "mem_usage": "191MiB / 93.6GiB",
+          "mem_perc": "0.20%"
+        },
+        "dnssec-auditor-bind": {
+          "cpu_perc": "0.00%",
+          "mem_usage": "237.3MiB / 93.6GiB",
+          "mem_perc": "0.25%"
+        }
+      },
+      "metrics": {
+        "timestamp": 1790769026.6348977,
+        "values": {
+          "dns_zone_manager_rrset_replaces_total{zone=\"perf5m.test.\"}": 4942.0,
+          "dns_zone_manager_rrset_replaces_total": 4942.0,
+          "dns_zone_manager_rrset_replaces_created{zone=\"perf5m.test.\"}": 1790768968.1744587,
+          "dns_zone_manager_rrset_replaces_created": 1790768968.1744587,
+          "dns_zone_manager_ddns_updates_successful_total": 4942.0,
+          "dns_zone_manager_ddns_updates_successful_created": 1790768948.2351918,
+          "dns_zone_manager_zone_transfers_total{method=\"axfr\",zone=\"perf5m.test.\"}": 1.0,
+          "dns_zone_manager_zone_transfers_total": 1.0,
+          "dns_zone_manager_zone_transfers_created{method=\"axfr\",zone=\"perf5m.test.\"}": 1790768968.1085486,
+          "dns_zone_manager_zone_transfers_created": 1790768968.1085486,
+          "dns_zone_manager_notifies_received_total{transport=\"udp\",zone=\"perf5m.test.\"}": 2.0,
+          "dns_zone_manager_notifies_received_total": 2.0,
+          "dns_zone_manager_notifies_received_created{transport=\"udp\",zone=\"perf5m.test.\"}": 1790768952.3786104,
+          "dns_zone_manager_notifies_received_created": 1790768952.3786104,
+          "dns_zone_manager_cache_size_bytes": 36993849.0,
+          "dns_zone_manager_cache_evictions_total": 0.0,
+          "dns_zone_manager_webhook_queue_dropped_total": 3798.0,
+          "dns_zone_manager_webhook_queue_dropped_created": 1790768948.2353868,
+          "dns_zone_manager_webhook_queue_depth": 0.0,
+          "dns_zone_manager_webhook_autorecorded_changes_total{outcome=\"recorded\"}": 1144.0,
+          "dns_zone_manager_webhook_autorecorded_changes_total": 1144.0,
+          "dns_zone_manager_webhook_autorecorded_changes_created{outcome=\"recorded\"}": 1790768968.2071342,
+          "dns_zone_manager_webhook_autorecorded_changes_created": 1790768968.2071342,
+          "dns_zone_manager_zone_ws_send_errors_total": 0.0,
+          "dns_zone_manager_zone_ws_send_errors_created": 1790768948.235413,
+          "dns_zone_manager_zone_ws_slow_client_drops_total": 0.0,
+          "dns_zone_manager_zone_ws_slow_client_drops_created": 1790768948.2354214
+        }
+      },
+      "serial_lag": {
+        "bind_serial": 1790768994,
+        "app_serial": 1790768994,
+        "lag_seconds": 0.045837277997634374,
+        "timed_out": false,
+        "timeout_seconds": 30.0
+      },
+      "host": {
+        "cwd": "/workspace"
+      }
+    }
+  },
+  "metrics_delta": {
+    "dns_zone_manager_cache_evictions_total": 0.0,
+    "dns_zone_manager_cache_size_bytes": 0.0,
+    "dns_zone_manager_ddns_updates_successful_total": 0.0,
+    "dns_zone_manager_notifies_received_total": 0.0,
+    "dns_zone_manager_notifies_received_total{transport=\"udp\",zone=\"perf5m.test.\"}": 0.0,
+    "dns_zone_manager_rrset_replaces_total": 0.0,
+    "dns_zone_manager_rrset_replaces_total{zone=\"perf5m.test.\"}": 0.0,
+    "dns_zone_manager_webhook_autorecorded_changes_total": 0.0,
+    "dns_zone_manager_webhook_autorecorded_changes_total{outcome=\"recorded\"}": 0.0,
+    "dns_zone_manager_webhook_queue_depth": 0.0,
+    "dns_zone_manager_webhook_queue_dropped_total": 0.0,
+    "dns_zone_manager_zone_transfers_total": 0.0,
+    "dns_zone_manager_zone_transfers_total{method=\"axfr\",zone=\"perf5m.test.\"}": 0.0,
+    "dns_zone_manager_zone_ws_send_errors_total": 0.0,
+    "dns_zone_manager_zone_ws_slow_client_drops_total": 0.0
+  },
+  "notes": [],
+  "errors": []
+}

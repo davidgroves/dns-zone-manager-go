@@ -1,0 +1,48 @@
+# Binaries / build output
+bin/
+dist/
+internal/ui/dist/*
+!internal/ui/dist/index.html
+*.exe
+*.test
+*.out
+
+# Node
+node_modules/
+npm-debug.log*
+playwright-report/
+test-results/
+coverage/
+.nyc_output/
+
+# Go
+vendor/
+*.coverprofile
+coverage.out
+coverage.html
+
+# Local / temp
+.tmp/
+tmp/
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*~
+.DS_Store
+
+# Perf results (local)
+perf/results/
+
+# Vite / TS
+*.tsbuildinfo

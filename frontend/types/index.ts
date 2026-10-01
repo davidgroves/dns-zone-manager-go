@@ -1,0 +1,563 @@
+// DNS Record Types
+
+export interface Zone {
+  zone: string;
+  from_catalog?: boolean;
+  record_count?: number;
+  zone_is_idn?: boolean;
+  zone_utf8?: string | null;
+}
+
+export interface RRset {
+  name: string;
+  type: string;
+  rdclass: string;
+  ttl: number;
+  records: string[];
+  name_is_idn?: boolean;
+  name_utf8?: string | null;
+  records_is_utf8?: boolean;
+  records_utf8?: string[] | null;
+}
+
+export interface SearchResultZone {
+  zone: string;
+  serial?: number;
+  rrsets: RRset[];
+  zone_is_idn?: boolean;
+  zone_utf8?: string | null;
+}
+
+export interface FlattenedSearchResult {
+  zone: string;
+  name: string;
+  type: string;
+  rdclass: string;
+  ttl: number;
+  records: string[];
+  zone_is_idn?: boolean;
+  zone_utf8?: string | null;
+  name_is_idn?: boolean;
+  name_utf8?: string | null;
+  records_is_utf8?: boolean;
+  records_utf8?: string[] | null;
+}
+
+export interface AtomicOperation {
+  action: 'add' | 'delete' | 'replace';
+  zone: string;
+  name: string;
+  type: string;
+  rdclass: string;
+  ttl: number;
+  records: string[] | null;
+}
+
+export interface AtomicResult {
+  success: boolean;
+  message: string;
+  operations_count?: number;
+}
+
+// Scheduled change types
+export type ChangeStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'running'
+  | 'applied'
+  | 'failed'
+  | 'cancelled'
+  | 'expired'
+  | 'reverted';
+
+export type PrereqType = 'nxdomain' | 'yxdomain' | 'nxrrset' | 'yxrrset';
+
+export interface ChangePrerequisite {
+  prereq_type: PrereqType;
+  name: string;
+  rdtype?: string | null;
+  rdclass?: string;
+  data?: string | null;
+}
+
+export interface ScheduledChangeEvent {
+  id: number;
+  change_id: string;
+  ts: string;
+  event: string;
+  actor: string | null;
+  detail: Record<string, unknown> | null;
+}
+
+/** Cross-change audit event (joined with change metadata). */
+export interface AuditEvent {
+  id: number;
+  ts: string;
+  event: string;
+  actor: string | null;
+  detail: Record<string, unknown> | null;
+  change_id: string;
+  change_name: string;
+  zone: string;
+  change_status: ChangeStatus;
+}
+
+/** Where a change record came from: the scheduler, or a direct DNS write. */
+export type ChangeSource = 'scheduler' | 'manual';
+
+export interface ScheduledChange {
+  id: string;
+  name: string;
+  description: string | null;
+  zone: string;
+  status: ChangeStatus;
+  source?: ChangeSource;
+  scheduled_at: string | null;
+  not_valid_after: string | null;
+  auto_prerequisites: boolean;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+  attempts: number;
+  next_attempt_at: string | null;
+  last_error: string | null;
+  applied_at: string | null;
+  result_rcode: string | null;
+  new_serial: number | null;
+  reverted_at?: string | null;
+  operations: Array<{
+    action: 'add' | 'delete' | 'replace';
+    name: string;
+    type: string;
+    rdclass: string;
+    ttl: number;
+    records: string[] | null;
+    prior_ttl?: number | null;
+    prior_records?: string[] | null;
+    snapshot_at?: string | null;
+  }>;
+  prerequisites: ChangePrerequisite[];
+  events?: ScheduledChangeEvent[];
+}
+
+export interface RevertOperation {
+  action: 'add' | 'delete';
+  name: string;
+  type: string;
+  rdclass: string;
+  ttl: number;
+  records: string[] | null;
+}
+
+export interface RevertPreview {
+  change_id: string;
+  zone: string;
+  operations: RevertOperation[];
+  warning: string;
+  message: string;
+  can_revert: boolean;
+}
+
+export interface PrerequisitePreviewResult {
+  prereq_type: PrereqType;
+  name: string;
+  rdtype: string | null;
+  rdclass: string;
+  data: string | null;
+  passed: boolean;
+  message: string;
+  source: 'explicit' | 'auto';
+}
+
+export interface ConflictWarning {
+  other_change_id: string;
+  other_change_name: string;
+  name: string;
+  type: string;
+  rdclass: string;
+}
+
+export interface PreviewResult {
+  change_id: string;
+  zone: string;
+  prerequisites: PrerequisitePreviewResult[];
+  all_prerequisites_passed: boolean;
+  conflicts: ConflictWarning[];
+  operations_count: number;
+  message: string;
+}
+
+export interface ScheduleForm {
+  name: string;
+  description: string;
+  applyNow: boolean;
+  scheduledLocal: string;
+  expiryHours: number;
+  autoPrerequisites: boolean;
+}
+
+/** An operation being edited in the schedule modal (zone is held separately). */
+export interface ScheduleOp {
+  action: 'add' | 'delete' | 'replace';
+  name: string;
+  type: string;
+  rdclass: string;
+  ttl: number;
+  records: string[] | null;
+  /** Working copy of records for the form (one value per line). */
+  recordsText: string;
+}
+
+export interface PrereqRow {
+  prereq_type: PrereqType;
+  name: string;
+  rdtype: string;
+  rdclass: string;
+  data: string;
+}
+
+export interface NsupdateDraftsResult {
+  created: ScheduledChange[];
+  total: number;
+}
+
+export interface ReversePtrCheckResult {
+  ip: string;
+  ptr_fqdn: string;
+  reverse_zone: string | null;
+  record_name: string | null;
+  zone_managed: boolean;
+  existing_ptrs: string[];
+  can_create: boolean;
+  error: string | null;
+}
+
+export interface ReversePtrCreateResult {
+  created_count: number;
+  skipped_count: number;
+  error_count: number;
+  results: Array<{
+    ip: string;
+    ptr_fqdn: string;
+    reverse_zone: string | null;
+    status: string;
+    message: string;
+  }>;
+}
+
+export interface Toast {
+  id: number;
+  message: string;
+  type: 'success' | 'error' | 'warning';
+  visible: boolean;
+}
+
+export interface CatalogStatus {
+  enabled: boolean;
+  zone?: string;
+  last_sync?: string;
+}
+
+export interface RecordForm {
+  name: string;
+  type: string;
+  rdclass: string;
+  ttl: number;
+  records: string;
+  zone?: string;
+  original?: RRset;
+}
+
+export interface DeleteTarget extends RRset {
+  zone: string;
+}
+
+// Pagination state types
+export type PageSizeMode = 'auto' | '25' | '50' | '100' | '250';
+
+export interface PaginationState {
+  mode: PageSizeMode;
+  size: number | null;
+  currentCursor: string | null;
+  nextCursor: string | null;
+  totalCount: number;
+  hasMore: boolean;
+  cursorHistory: (string | null)[];
+}
+
+// Sort types
+export type SortField = 'name' | 'type' | 'rdclass' | 'ttl' | 'data' | 'zone';
+export type SortDirection = 'asc' | 'desc';
+export type SearchField = 'name' | 'data' | 'either';
+
+// API Response types
+export interface PaginatedResponse<T> {
+  total_count?: number;
+  next_cursor?: string | null;
+  has_more?: boolean;
+  page_size?: number;
+  zones?: T[];
+  rrsets?: T[];
+  results?: T[];
+}
+
+export interface ZoneSearchResponse {
+  zone: string;
+  serial?: number;
+  results: RRset[];
+  total_count?: number;
+  next_cursor?: string | null;
+  has_more?: boolean;
+}
+
+// Zone History types
+export interface HistoryChange {
+  action: 'add' | 'delete';
+  name: string;
+  ttl: number;
+  type: string;
+  rdclass: string;
+  records: string[];
+}
+
+export interface HistoryBatch {
+  from_serial: number;
+  to_serial: number;
+  changes: HistoryChange[];
+}
+
+export interface ZoneHistory {
+  zone: string;
+  current_serial: number;
+  history: HistoryBatch[];
+  available_from_serial: number;
+  is_full_axfr: boolean;
+}
+
+export interface RollbackPreview {
+  zone: string;
+  current_serial: number;
+  target_serial: number;
+  changes: HistoryChange[];
+  change_count: number;
+  can_rollback: boolean;
+  warning: string | null;
+}
+
+export interface RollbackResult {
+  success: boolean;
+  zone: string;
+  from_serial: number;
+  to_serial: number;
+  new_serial: number;
+  changes_applied: number;
+  message: string;
+}
+
+// Main application state interface
+export interface AppState {
+  // Auth state
+  authenticated: boolean;
+  apiKey: string | null;
+  apiKeyInput: string;
+  rememberApiKey: boolean;
+  loginError: string;
+  apiKeyEnabled: boolean;
+  proxyAuthEnabled: boolean;
+  currentUser: string | null;
+  appVersion: string;
+
+  // Branding / theme
+  appName: string;
+  logoUrl: string | null;
+  logoAlt: string;
+  themeMode: 'dark' | 'light';
+  allowModeToggle: boolean;
+
+  // UI state
+  loadingZones: boolean;
+  loadingRecords: boolean;
+  refreshing: boolean;
+  refreshingZone: boolean;
+  saving: boolean;
+
+  // Data
+  zones: Zone[];
+  zoneFilter: string;
+  selectedZone: string | null;
+  records: RRset[];
+  liveFlashKeys: Set<string>;
+  catalogStatus: CatalogStatus | null;
+  catalogZones: Set<string>;
+  syncingCatalog: boolean;
+
+  // Record Pagination
+  pageSizeMode: PageSizeMode;
+  pageSize: number | null;
+  currentCursor: string | null;
+  nextCursor: string | null;
+  totalRecords: number;
+  hasMoreRecords: boolean;
+  recordCursorHistory: (string | null)[];
+
+  // Zone Pagination
+  zonePageSizeMode: PageSizeMode;
+  zonePageSize: number | null;
+  zoneCurrentCursor: string | null;
+  zoneNextCursor: string | null;
+  zoneTotalCount: number;
+  zoneHasMore: boolean;
+  zoneCursorHistory: (string | null)[];
+
+  // Search
+  searchQuery: string;
+  searchType: string;
+  searchField: SearchField;
+  searchResults: SearchResultZone[];
+  isSearching: boolean;
+  searchAllZones: boolean;
+
+  // Search Pagination
+  searchPageSizeMode: PageSizeMode;
+  searchPageSize: number | null;
+  searchCurrentCursor: string | null;
+  searchNextCursor: string | null;
+  searchTotalCount: number;
+  searchHasMore: boolean;
+  searchCursorHistory: (string | null)[];
+
+  // Sorting (zone records)
+  sortField: SortField;
+  sortDirection: SortDirection;
+
+  // Sorting (search results)
+  searchSortField: SortField;
+  searchSortDirection: SortDirection;
+
+  // Modals
+  showAddZone: boolean;
+  showAddRecord: boolean;
+  showEditRecord: boolean;
+  showDeleteConfirm: boolean;
+  showNsupdate: boolean;
+  showAtomicModal: boolean;
+  showReversePtrModal: boolean;
+  showScheduleModal: boolean;
+  showScheduledView: boolean;
+  showAuditView: boolean;
+
+  // Atomic mode
+  atomicMode: boolean;
+  atomicQueue: AtomicOperation[];
+  atomicResult: AtomicResult | null;
+
+  // Scheduled changes
+  scheduledChanges: ScheduledChange[];
+  scheduledLoading: boolean;
+  scheduleForm: ScheduleForm;
+  scheduleMode: 'create' | 'edit';
+  /** How the schedule modal was opened: from Atomic queue, New button, or Edit. */
+  scheduleSource: 'queue' | 'new' | 'edit';
+  editingChangeId: string | null;
+  scheduleOps: ScheduleOp[];
+  scheduleZone: string;
+  prereqRows: PrereqRow[];
+  previewResult: PreviewResult | null;
+  previewLoading: boolean;
+  selectedScheduledChange: ScheduledChange | null;
+  scheduledStatusFilters: ChangeStatus[];
+  showScheduledStatusMenu: boolean;
+  /** Empty string means both scheduler and manual changes. */
+  scheduledSourceFilter: ChangeSource | '';
+  showRevertModal: boolean;
+  revertPreview: RevertPreview | null;
+
+  // Audit log (cross-change)
+  auditEvents: AuditEvent[];
+  auditLoading: boolean;
+  auditTotal: number;
+  auditLimit: number;
+  auditOffset: number;
+  auditEventFilters: string[];
+  showAuditEventMenu: boolean;
+  auditActorFilter: string;
+  auditZoneFilter: string;
+  auditQuery: string;
+  auditSince: string;
+  auditUntil: string;
+
+  // Reverse PTR
+  reversePtrTarget: string;
+  reversePtrTtl: number;
+  reversePtrResults: ReversePtrCheckResult[];
+  reversePtrSelected: string[];
+  reversePtrMode: 'replace' | 'add_roundrobin';
+  reversePtrLoading: boolean;
+  reversePtrCreateResult: ReversePtrCreateResult | null;
+
+  // Zone History
+  showHistoryModal: boolean;
+  historyLoading: boolean;
+  historyFromSerial: number;
+  zoneHistory: ZoneHistory | null;
+  rollbackPreview: RollbackPreview | null;
+  rollbackTargetSerial: number | null;
+  rollbackLoading: boolean;
+  expandedBatches: Set<number>;
+
+  // Forms
+  newZoneName: string;
+  recordForm: RecordForm;
+  customTypeMode: boolean;
+  customClassMode: boolean;
+  deleteTarget: DeleteTarget | null;
+  nsupdateText: string;
+  nsupdateResult: NsupdateDraftsResult | null;
+
+  // Toasts
+  toasts: Toast[];
+  toastId: number;
+
+  // Router
+  intendedRoute: RouteParams | null;
+}
+
+// Config passed at init or fetched from /ui/config API
+export type ThemeMode = 'dark' | 'light' | 'auto';
+
+/** CSS custom-property name → colour value (only overridden tokens). */
+export type ThemePalette = Record<string, string>;
+
+export interface ThemeLogo {
+  url: string;
+  alt: string;
+}
+
+export interface ThemeConfig {
+  appName?: string;
+  defaultMode?: ThemeMode;
+  allowModeToggle?: boolean;
+  logo?: ThemeLogo | null;
+  light?: ThemePalette;
+  dark?: ThemePalette;
+}
+
+export interface AppConfig {
+  apiKeyEnabled?: boolean;
+  proxyAuthEnabled?: boolean;
+  version?: string;
+  theme?: ThemeConfig;
+}
+
+// Route parameters for URL-based navigation
+export interface RouteParams {
+  zone: string | null;
+  page: number;
+  searchQuery: string | null;
+  searchType: string | null;
+  searchField: SearchField;
+  searchAllZones: boolean;
+  view: string | null;
+  /** Selected scheduled change id when view=scheduled */
+  change: string | null;
+}

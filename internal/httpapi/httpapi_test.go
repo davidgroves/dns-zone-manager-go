@@ -1,0 +1,284 @@
+package httpapi_test
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/miekg/dns"
+
+	"github.com/davidgroves/dns-zone-manager-go/internal/auth"
+	"github.com/davidgroves/dns-zone-manager-go/internal/config"
+	"github.com/davidgroves/dns-zone-manager-go/internal/dnsx"
+	"github.com/davidgroves/dns-zone-manager-go/internal/httpapi"
+)
+
+func testSettings() *config.Settings {
+	return &config.Settings{
+		AppName: "DNS Zone Manager Test",
+		Server:  config.ServerSettings{MaxBodyBytes: 1 << 20},
+		Logging: config.LoggingSettings{
+			Format: "json", Level: "error", SampleRate: 0, SlowThresholdMS: 1000,
+		},
+		Cache:     config.CacheSettings{Enabled: true},
+		DNS:       config.DNSSettings{Server: "127.0.0.1", Port: 53},
+		APIKey:    config.APIKeySettings{Enabled: false},
+		ProxyAuth: config.ProxyAuthSettings{Enabled: false},
+		Theme:     config.ThemeSettings{DefaultMode: "light", AllowModeToggle: true},
+		NSUpdate: config.NSUpdateSettings{
+			MaxBodyBytes: 1 << 20, MaxLines: 1000, MaxTransactions: 100,
+		},
+	}
+}
+
+type fakeBackend struct {
+	zones map[string]*dnsx.Zone
+}
+
+func newFakeBackend() *fakeBackend {
+	return &fakeBackend{zones: map[string]*dnsx.Zone{}}
+}
+
+func parseZoneRRs(origin string, serial uint32) []dns.RR {
+	origin = dnsx.NormalizeZoneName(origin)
+	text := fmt.Sprintf("%s 3600 IN SOA ns.%s hostmaster.%s %d 7200 3600 1209600 3600\n", origin, origin, origin, serial)
+	text += fmt.Sprintf("%s 3600 IN NS ns.%s\n", origin, origin)
+	text += fmt.Sprintf("www.%s 300 IN A 192.0.2.1\n", origin)
+	text += fmt.Sprintf("api.%s 300 IN A 192.0.2.2\n", origin)
+	var out []dns.RR
+	for _, line := range strings.Split(strings.TrimSpace(text), "\n") {
+		rr, err := dns.NewRR(line)
+		if err != nil {
+			panic(err)
+		}
+		out = append(out, rr)
+	}
+	return out
+}
+
+func (f *fakeBackend) PerformAXFR(_ context.Context, zone string) (*dnsx.Zone, error) {
+	zone = dnsx.NormalizeZoneName(zone)
+	z, ok := f.zones[zone]
+	if !ok {
+		return nil, &dnsx.ZoneTransferError{Message: "zone not found: " + zone}
+	}
+	return z, nil
+}
+
+func (f *fakeBackend) PerformIXFR(_ context.Context, zone string, fromSerial uint32) (dnsx.IXFRResult, error) {
+	zone = dnsx.NormalizeZoneName(zone)
+	if _, ok := f.zones[zone]; !ok {
+		return dnsx.IXFRResult{}, &dnsx.ZoneTransferError{Message: "zone not found"}
+	}
+	return dnsx.IXFRResult{NewSerial: fromSerial}, nil
+}
+
+func (f *fakeBackend) QuerySOA(_ context.Context, zone string) (uint32, error) {
+	zone = dnsx.NormalizeZoneName(zone)
+	z, ok := f.zones[zone]
+	if !ok {
+		return 0, &dnsx.ZoneTransferError{Message: "zone not found"}
+	}
+	s, ok := z.SOASerial()
+	if !ok {
+		return 1, nil
+	}
+	return s, nil
+}
+
+func (f *fakeBackend) seed(zone string, serial uint32) {
+	zone = dnsx.NormalizeZoneName(zone)
+	z := dnsx.NewZone(zone)
+	if err := z.SetFromAXFR(parseZoneRRs(zone, serial)); err != nil {
+		panic(err)
+	}
+	f.zones[zone] = z
+}
+
+func testHandler(t *testing.T) http.Handler {
+	t.Helper()
+	settings := testSettings()
+	backend := newFakeBackend()
+	backend.seed("example.com.", 1)
+	backend.seed("other.com.", 1)
+	cache := dnsx.NewCacheWithBackend(settings, backend)
+	if _, err := cache.LoadZone(context.Background(), "example.com."); err != nil {
+		t.Fatalf("load zone: %v", err)
+	}
+	if _, err := cache.LoadZone(context.Background(), "other.com."); err != nil {
+		t.Fatalf("load zone: %v", err)
+	}
+	return httpapi.New(httpapi.Deps{
+		Settings:   settings,
+		Auth:       auth.NewCombined(settings),
+		Cache:      cache,
+		DNSReady:   func(context.Context) bool { return true },
+		StoreReady: func(context.Context) bool { return true },
+	})
+}
+
+func doJSON(t *testing.T, h http.Handler, method, path string) (int, map[string]any, http.Header) {
+	t.Helper()
+	req := httptest.NewRequest(method, path, nil)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	var body map[string]any
+	b, _ := io.ReadAll(rr.Body)
+	if len(b) > 0 {
+		_ = json.Unmarshal(b, &body)
+	}
+	return rr.Code, body, rr.Header()
+}
+
+func TestHealth(t *testing.T) {
+	h := testHandler(t)
+	code, body, hdr := doJSON(t, h, http.MethodGet, "/health")
+	if code != http.StatusOK {
+		t.Fatalf("status %d", code)
+	}
+	if body["status"] != "healthy" {
+		t.Fatalf("status=%v", body["status"])
+	}
+	if body["dns_connected"] != true {
+		t.Fatalf("dns_connected=%v", body["dns_connected"])
+	}
+	_ = hdr.Get("X-Request-ID") // /health is excluded from WideEvent — request id optional
+}
+
+func TestUIConfig(t *testing.T) {
+	h := testHandler(t)
+	code, body, _ := doJSON(t, h, http.MethodGet, "/ui/config")
+	if code != http.StatusOK {
+		t.Fatalf("status %d body=%v", code, body)
+	}
+	if body["apiKeyEnabled"] != false {
+		t.Fatalf("apiKeyEnabled=%v", body["apiKeyEnabled"])
+	}
+	if body["version"] == nil {
+		t.Fatal("missing version")
+	}
+	theme, ok := body["theme"].(map[string]any)
+	if !ok || theme["appName"] == nil {
+		t.Fatalf("theme=%v", body["theme"])
+	}
+}
+
+func TestAuthValidate(t *testing.T) {
+	h := testHandler(t)
+	code, body, _ := doJSON(t, h, http.MethodGet, "/v1/auth/validate")
+	if code != http.StatusOK {
+		t.Fatalf("status %d body=%v", code, body)
+	}
+	if body["valid"] != true {
+		t.Fatalf("valid=%v", body["valid"])
+	}
+	if body["user_id"] != "anonymous" {
+		t.Fatalf("user_id=%v", body["user_id"])
+	}
+	if body["auth_type"] != "none" {
+		t.Fatalf("auth_type=%v", body["auth_type"])
+	}
+}
+
+func TestListZonesPaginationCursorRoundtrip(t *testing.T) {
+	h := testHandler(t)
+	limit := 1
+	code, body, hdr := doJSON(t, h, http.MethodGet, fmt.Sprintf("/v1/zones?limit=%d", limit))
+	if code != http.StatusOK {
+		t.Fatalf("status %d body=%v", code, body)
+	}
+	if hdr.Get("X-Request-ID") == "" {
+		t.Fatal("expected X-Request-ID on response")
+	}
+	zones, _ := body["zones"].([]any)
+	if len(zones) != 1 {
+		t.Fatalf("expected 1 zone, got %d (%v)", len(zones), body)
+	}
+	total, _ := body["total_count"].(float64)
+	if total < 2 {
+		t.Fatalf("total_count=%v", body["total_count"])
+	}
+	if body["has_more"] != true {
+		t.Fatalf("has_more=%v", body["has_more"])
+	}
+	cursor, _ := body["next_cursor"].(string)
+	if cursor == "" {
+		t.Fatal("expected next_cursor")
+	}
+	// Round-trip Decode
+	var payload httpapi.ZoneCursor
+	if err := httpapi.DecodeCursor(cursor, &payload); err != nil {
+		t.Fatalf("decode cursor: %v", err)
+	}
+	if payload.N == "" {
+		t.Fatal("cursor missing n")
+	}
+	enc, err := httpapi.EncodeCursor(payload)
+	if err != nil || enc != cursor {
+		t.Fatalf("encode roundtrip got %q want %q err=%v", enc, cursor, err)
+	}
+
+	code2, body2, _ := doJSON(t, h, http.MethodGet, "/v1/zones?limit=1&after="+cursor)
+	if code2 != http.StatusOK {
+		t.Fatalf("page2 status %d", code2)
+	}
+	zones2, _ := body2["zones"].([]any)
+	if len(zones2) != 1 {
+		t.Fatalf("page2 zones=%v", body2)
+	}
+	z1 := zones[0].(map[string]any)["zone"]
+	z2 := zones2[0].(map[string]any)["zone"]
+	if z1 == z2 {
+		t.Fatalf("expected different zones across pages, both %v", z1)
+	}
+}
+
+func TestProblemJSONNotFound(t *testing.T) {
+	h := testHandler(t)
+	code, body, hdr := doJSON(t, h, http.MethodGet, "/v1/zones/missing.example.")
+	if code != http.StatusNotFound {
+		t.Fatalf("status %d body=%v", code, body)
+	}
+	ct := hdr.Get("Content-Type")
+	if !strings.Contains(ct, "problem+json") && !strings.Contains(ct, "json") {
+		t.Fatalf("content-type=%q", ct)
+	}
+	if body["status"] != float64(404) && body["title"] == nil && body["detail"] == nil {
+		t.Fatalf("expected problem+json shape, got %v", body)
+	}
+	// Huma ErrorModel shape
+	if body["detail"] == nil && body["title"] == nil {
+		t.Fatalf("missing detail/title: %v", body)
+	}
+}
+
+func TestCursorEncodeDecodeVariants(t *testing.T) {
+	rr, err := httpapi.EncodeCursor(httpapi.RRsetCursorPayload{N: "www.example.com.", T: "A"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded httpapi.RRsetCursorPayload
+	if err := httpapi.DecodeCursor(rr, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.N != "www.example.com." || decoded.T != "A" {
+		t.Fatalf("%+v", decoded)
+	}
+
+	g, err := httpapi.EncodeCursor(httpapi.GlobalSearchCursor{Z: "example.com.", N: "www.example.com."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gd httpapi.GlobalSearchCursor
+	if err := httpapi.DecodeCursor(g, &gd); err != nil {
+		t.Fatal(err)
+	}
+	if gd.Z != "example.com." || gd.N != "www.example.com." {
+		t.Fatalf("%+v", gd)
+	}
+}

@@ -1,0 +1,683 @@
+import { API_BASE, api, formatDNSErrorWithRequestID, requestIDFromResponse } from '../api/client';
+import type {
+  AppState,
+  ChangeSource,
+  ChangeStatus,
+  PreviewResult,
+  RevertPreview,
+  ScheduledChange,
+} from '../types';
+import {
+  blankScheduleOp,
+  buildCreatePayload,
+  buildUpdatePayload,
+  canRevertChange,
+  formFromChange,
+  formatScheduledDisplay,
+  sourceBadgeClass,
+  sourceLabel,
+  utcIsoToLocalDatetime,
+  validateScheduleOps,
+} from './scheduledHelpers';
+
+/** Statuses that can still be edited, cancelled, previewed or applied. */
+const EDITABLE_STATUSES: ChangeStatus[] = ['draft', 'scheduled', 'failed'];
+
+const ALL_CHANGE_STATUSES: ChangeStatus[] = [
+  'draft',
+  'scheduled',
+  'running',
+  'applied',
+  'reverted',
+  'failed',
+  'cancelled',
+  'expired',
+];
+
+const STATUS_LABELS: Record<ChangeStatus, string> = {
+  draft: 'Draft',
+  scheduled: 'Scheduled',
+  running: 'Running',
+  applied: 'Applied',
+  reverted: 'Reverted',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  expired: 'Expired',
+};
+
+type ScheduledMethodContext = AppState & {
+  toast: (message: string, type?: 'success' | 'error' | 'warning') => void;
+  loadRecords: (
+    cursor?: string | null,
+    resetHistory?: boolean,
+  ) => Promise<void>;
+  loadZones: (cursor?: string | null, resetHistory?: boolean) => Promise<void>;
+  updateUrlFromState: () => void;
+  loadScheduledChanges: () => Promise<void>;
+  openScheduledView: () => void;
+  viewScheduledChange: (id: string) => Promise<void>;
+  runScheduledPreview: (
+    id: string,
+    options?: { toast?: boolean },
+  ) => Promise<void>;
+  isChangeEditable: (status: ChangeStatus) => boolean;
+  closeScheduleModal: () => void;
+  closeRevertModal: () => void;
+  $nextTick?: (callback?: () => void) => Promise<void>;
+};
+
+/**
+ * Scheduled changes module.
+ */
+export function createScheduledMethods(_state: AppState) {
+  return {
+    formatScheduledDisplay,
+    canRevertChange,
+
+    /**
+     * Open the schedule modal pre-filled from the atomic queue.
+     */
+    openScheduleFromQueue(this: ScheduledMethodContext) {
+      if (this.atomicQueue.length === 0) {
+        this.toast('No pending changes to save', 'warning');
+        return;
+      }
+      const zones = [...new Set(this.atomicQueue.map((op) => op.zone))];
+      if (zones.length > 1) {
+        this.toast(
+          'Scheduled changes must be for a single zone. Submit each zone separately.',
+          'error',
+        );
+        return;
+      }
+      this.scheduleMode = 'create';
+      this.scheduleSource = 'queue';
+      this.editingChangeId = null;
+      this.scheduleZone = zones[0];
+      this.scheduleOps = this.atomicQueue.map((op) =>
+        blankScheduleOp({
+          action: op.action,
+          name: op.name,
+          type: op.type,
+          rdclass: op.rdclass || 'IN',
+          ttl: op.ttl,
+          records: op.records,
+        }),
+      );
+      this.scheduleForm = {
+        name: `Change for ${zones[0].replace(/\.$/, '')}`,
+        description: '',
+        applyNow: true,
+        scheduledLocal: '',
+        expiryHours: 1,
+        autoPrerequisites: true,
+      };
+      this.prereqRows = [];
+      this.previewResult = null;
+      this.showAtomicModal = false;
+      this.showScheduleModal = true;
+    },
+
+    /**
+     * Open an empty schedule modal to create a change from scratch.
+     */
+    async openNewScheduledChange(this: ScheduledMethodContext) {
+      if (this.zones.length === 0) {
+        await this.loadZones();
+      }
+      const defaultZone =
+        this.selectedZone ||
+        (this.zones.length === 1 ? this.zones[0].zone : '') ||
+        '';
+      this.scheduleMode = 'create';
+      this.scheduleSource = 'new';
+      this.editingChangeId = null;
+      this.scheduleZone = defaultZone;
+      this.scheduleOps = [blankScheduleOp()];
+      this.scheduleForm = {
+        name: '',
+        description: '',
+        applyNow: true,
+        scheduledLocal: '',
+        expiryHours: 1,
+        autoPrerequisites: true,
+      };
+      this.prereqRows = [];
+      this.previewResult = null;
+      this.showScheduleModal = true;
+    },
+
+    /**
+     * Open the schedule modal to edit an existing change.
+     */
+    async editScheduledChange(this: ScheduledMethodContext, id: string) {
+      try {
+        const response = await api(
+          `${API_BASE}/scheduled-changes/${encodeURIComponent(id)}`,
+          this.apiKey,
+        );
+        if (!response.ok) {
+          const data = await response.json();
+          this.toast(formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          return;
+        }
+        const change = (await response.json()) as ScheduledChange;
+
+        if (!EDITABLE_STATUSES.includes(change.status)) {
+          this.toast(`Cannot edit a change that is ${change.status}`, 'error');
+          return;
+        }
+
+        this.scheduleMode = 'edit';
+        this.scheduleSource = 'edit';
+        this.editingChangeId = change.id;
+        this.scheduleZone = change.zone;
+        this.scheduleOps = change.operations.map((op) =>
+          blankScheduleOp({
+            action: op.action,
+            name: op.name,
+            type: op.type,
+            rdclass: op.rdclass || 'IN',
+            ttl: op.ttl,
+            records: op.records,
+          }),
+        );
+        this.scheduleForm = formFromChange(change);
+        this.prereqRows = change.prerequisites.map((p) => ({
+          prereq_type: p.prereq_type,
+          name: p.name,
+          rdtype: p.rdtype || 'A',
+          rdclass: p.rdclass || 'IN',
+          data: p.data || '',
+        }));
+        this.previewResult = null;
+        this.showScheduleModal = true;
+      } catch (e) {
+        this.toast((e as Error).message, 'error');
+      }
+    },
+
+    /**
+     * Append a blank operation row to the change being edited.
+     */
+    addScheduleOp(this: ScheduledMethodContext) {
+      this.scheduleOps.push(blankScheduleOp());
+    },
+
+    /**
+     * Remove an operation from the change being edited.
+     */
+    removeScheduleOp(this: ScheduledMethodContext, index: number) {
+      if (this.scheduleOps.length <= 1) {
+        this.toast('A change must keep at least one operation', 'warning');
+        return;
+      }
+      this.scheduleOps.splice(index, 1);
+    },
+
+    addPrereqRow(this: ScheduledMethodContext) {
+      this.prereqRows.push({
+        prereq_type: 'nxrrset',
+        name: '',
+        rdtype: 'A',
+        rdclass: 'IN',
+        data: '',
+      });
+    },
+
+    removePrereqRow(this: ScheduledMethodContext, index: number) {
+      this.prereqRows.splice(index, 1);
+    },
+
+    closeScheduleModal(this: ScheduledMethodContext) {
+      this.showScheduleModal = false;
+      this.previewResult = null;
+      this.scheduleMode = 'create';
+      this.scheduleSource = 'new';
+      this.editingChangeId = null;
+      this.scheduleOps = [];
+      this.scheduleZone = '';
+    },
+
+    scheduleModalTitle(this: ScheduledMethodContext): string {
+      if (this.scheduleMode === 'edit' || this.scheduleSource === 'edit') {
+        return 'Edit Scheduled Change';
+      }
+      if (this.scheduleSource === 'queue') {
+        return 'Save as Scheduled Change';
+      }
+      return 'New Scheduled Change';
+    },
+
+    /**
+     * Create a new change, or save edits to an existing one.
+     */
+    async saveScheduledChange(this: ScheduledMethodContext) {
+      if (!this.scheduleForm.name.trim()) {
+        this.toast('Name is required', 'error');
+        return;
+      }
+      const isEdit = this.scheduleMode === 'edit' && this.editingChangeId;
+      if (!isEdit && !this.scheduleZone.trim()) {
+        this.toast('Zone is required', 'error');
+        return;
+      }
+      const opsError = validateScheduleOps(this.scheduleOps);
+      if (opsError) {
+        this.toast(opsError, 'error');
+        return;
+      }
+      if (!this.scheduleForm.applyNow && !this.scheduleForm.scheduledLocal) {
+        this.toast(
+          'Pick a schedule time, or tick "Save as draft" to apply manually later',
+          'error',
+        );
+        return;
+      }
+
+      this.saving = true;
+      try {
+        const url = isEdit
+          ? `${API_BASE}/scheduled-changes/${encodeURIComponent(this.editingChangeId as string)}`
+          : `${API_BASE}/scheduled-changes`;
+        let zone = this.scheduleZone.trim();
+        if (!isEdit && zone && !zone.endsWith('.')) {
+          zone = `${zone}.`;
+        }
+        const payload = isEdit
+          ? buildUpdatePayload(this.scheduleForm, this.scheduleOps, this.prereqRows)
+          : buildCreatePayload(
+              this.scheduleForm,
+              zone,
+              this.scheduleOps,
+              this.prereqRows,
+            );
+
+        const response = await api(url, this.apiKey, {
+          method: isEdit ? 'PATCH' : 'POST',
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          this.toast(`Failed to save: ${formatDNSErrorWithRequestID(data, requestIDFromResponse(response))}`, 'error');
+          return;
+        }
+
+        if (isEdit) {
+          this.toast(`Updated "${data.name}"`, 'success');
+        } else {
+          this.toast(
+            data.status === 'scheduled'
+              ? `Scheduled "${data.name}" for ${formatScheduledDisplay(data.scheduled_at)}`
+              : `Saved draft "${data.name}"`,
+            'success',
+          );
+          // Only clear the Atomic queue when this change was created from it.
+          if (this.scheduleSource === 'queue') {
+            this.atomicQueue = [];
+            this.atomicMode = false;
+          }
+        }
+
+        this.closeScheduleModal();
+        await this.loadScheduledChanges();
+        if (this.selectedScheduledChange?.id === data.id) {
+          await this.viewScheduledChange(data.id);
+        }
+      } catch (e) {
+        this.toast(`Failed to save: ${(e as Error).message}`, 'error');
+      } finally {
+        this.saving = false;
+      }
+    },
+
+    async loadScheduledChanges(this: ScheduledMethodContext) {
+      this.scheduledLoading = true;
+      try {
+        const params = new URLSearchParams();
+        const filters = this.scheduledStatusFilters || [];
+        // Empty selection means all statuses (no filter param).
+        if (filters.length > 0 && filters.length < ALL_CHANGE_STATUSES.length) {
+          for (const status of filters) {
+            params.append('status', status);
+          }
+        }
+        if (this.scheduledSourceFilter) {
+          params.append('source', this.scheduledSourceFilter);
+        }
+        const qs = params.toString();
+        const url = `${API_BASE}/scheduled-changes${qs ? `?${qs}` : ''}`;
+        const response = await api(url, this.apiKey);
+        if (!response.ok) {
+          const data = await response.json();
+          this.toast(`Failed to load changes: ${formatDNSErrorWithRequestID(data, requestIDFromResponse(response))}`, 'error');
+          return;
+        }
+        const data = await response.json();
+        this.scheduledChanges = data.changes || [];
+      } catch (e) {
+        this.toast(`Failed to load changes: ${(e as Error).message}`, 'error');
+      } finally {
+        this.scheduledLoading = false;
+      }
+    },
+
+    scheduledStatusFilterLabel(this: ScheduledMethodContext): string {
+      const filters = this.scheduledStatusFilters || [];
+      if (filters.length === 0 || filters.length === ALL_CHANGE_STATUSES.length) {
+        return 'All statuses';
+      }
+      if (filters.length <= 3) {
+        return filters.map((s) => STATUS_LABELS[s] || s).join(', ');
+      }
+      return `${filters.length} statuses`;
+    },
+
+    isScheduledStatusSelected(this: ScheduledMethodContext, status: ChangeStatus): boolean {
+      return (this.scheduledStatusFilters || []).includes(status);
+    },
+
+    toggleScheduledStatus(this: ScheduledMethodContext, status: ChangeStatus) {
+      const current = [...(this.scheduledStatusFilters || [])];
+      const idx = current.indexOf(status);
+      if (idx >= 0) {
+        current.splice(idx, 1);
+      } else {
+        current.push(status);
+      }
+      this.scheduledStatusFilters = current;
+      void this.loadScheduledChanges();
+    },
+
+    selectAllScheduledStatuses(this: ScheduledMethodContext) {
+      this.scheduledStatusFilters = [...ALL_CHANGE_STATUSES];
+      void this.loadScheduledChanges();
+    },
+
+    resetScheduledStatusFilters(this: ScheduledMethodContext) {
+      this.scheduledStatusFilters = ['draft', 'scheduled', 'failed'];
+      void this.loadScheduledChanges();
+    },
+
+    allChangeStatuses(this: ScheduledMethodContext): ChangeStatus[] {
+      return ALL_CHANGE_STATUSES;
+    },
+
+    setScheduledSourceFilter(
+      this: ScheduledMethodContext,
+      source: ChangeSource | '',
+    ) {
+      this.scheduledSourceFilter = source;
+      // Manual changes are recorded after the fact, so they are only ever
+      // applied or failed. The default status filter hides applied changes,
+      // which would make this filter look broken; widen it (visibly, in the
+      // status dropdown) so the selection returns something.
+      if (source === 'manual' && !this.scheduledStatusFilters.includes('applied')) {
+        this.scheduledStatusFilters = ['applied', 'failed'];
+      }
+      void this.loadScheduledChanges();
+    },
+
+    sourceLabel(this: ScheduledMethodContext, source: string | null | undefined): string {
+      return sourceLabel(source);
+    },
+
+    sourceBadgeClass(
+      this: ScheduledMethodContext,
+      source: string | null | undefined,
+    ): string {
+      return sourceBadgeClass(source);
+    },
+
+    statusLabel(this: ScheduledMethodContext, status: ChangeStatus): string {
+      return STATUS_LABELS[status] || status;
+    },
+
+    openScheduledView(this: ScheduledMethodContext) {
+      this.showScheduledView = true;
+      this.showAuditView = false;
+      this.selectedZone = null;
+      this.isSearching = false;
+      this.showAuditEventMenu = false;
+      this.updateUrlFromState();
+      void this.loadScheduledChanges();
+    },
+
+    /**
+     * Open scheduled view and select a change by id (for deep links / audit).
+     * Widens status filters so terminal statuses remain visible in the list.
+     */
+    async openScheduledChangeById(this: ScheduledMethodContext, id: string) {
+      this.openScheduledView();
+      this.scheduledStatusFilters = [...ALL_CHANGE_STATUSES];
+      await this.loadScheduledChanges();
+      await this.viewScheduledChange(id);
+    },
+
+    closeScheduledView(this: ScheduledMethodContext) {
+      this.showScheduledView = false;
+      this.selectedScheduledChange = null;
+      this.previewResult = null;
+      this.previewLoading = false;
+      this.updateUrlFromState();
+    },
+
+    clearSelectedScheduledChange(this: ScheduledMethodContext) {
+      this.selectedScheduledChange = null;
+      this.previewResult = null;
+      this.previewLoading = false;
+      this.updateUrlFromState();
+    },
+
+    async viewScheduledChange(this: ScheduledMethodContext, id: string) {
+      try {
+        const response = await api(
+          `${API_BASE}/scheduled-changes/${encodeURIComponent(id)}`,
+          this.apiKey,
+        );
+        if (!response.ok) {
+          const data = await response.json();
+          this.toast(formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          this.selectedScheduledChange = null;
+          this.updateUrlFromState();
+          return;
+        }
+        const change = (await response.json()) as ScheduledChange;
+        this.selectedScheduledChange = change;
+        this.previewResult = null;
+        this.updateUrlFromState();
+        // Detail panel sits above the table; scroll it into view after Alpine renders.
+        const scroll = () =>
+          document
+            .getElementById('scheduled-change-detail')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (typeof this.$nextTick === 'function') {
+          await this.$nextTick();
+          scroll();
+        } else {
+          requestAnimationFrame(() => requestAnimationFrame(scroll));
+        }
+
+        if (this.isChangeEditable(change.status)) {
+          await this.runScheduledPreview(id, { toast: false });
+        }
+      } catch (e) {
+        this.toast((e as Error).message, 'error');
+        this.selectedScheduledChange = null;
+        this.updateUrlFromState();
+      }
+    },
+
+    async runScheduledPreview(
+      this: ScheduledMethodContext,
+      id: string,
+      options: { toast?: boolean } = {},
+    ) {
+      const showToast = options.toast !== false;
+      this.previewLoading = true;
+      try {
+        const response = await api(
+          `${API_BASE}/scheduled-changes/${encodeURIComponent(id)}/preview`,
+          this.apiKey,
+          { method: 'POST' },
+        );
+        const data = await response.json();
+        if (!response.ok) {
+          this.toast(formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          return;
+        }
+        this.previewResult = data as PreviewResult;
+        if (showToast) {
+          this.toast(
+            data.message,
+            data.all_prerequisites_passed ? 'success' : 'warning',
+          );
+        }
+      } catch (e) {
+        this.toast((e as Error).message, 'error');
+      } finally {
+        this.previewLoading = false;
+      }
+    },
+
+    async previewScheduledChange(this: ScheduledMethodContext, id: string) {
+      await this.runScheduledPreview(id, { toast: true });
+    },
+
+    async applyScheduledChangeNow(this: ScheduledMethodContext, id: string) {
+      if (!confirm('Apply this change to DNS now?')) return;
+      this.saving = true;
+      try {
+        const response = await api(
+          `${API_BASE}/scheduled-changes/${encodeURIComponent(id)}/apply`,
+          this.apiKey,
+          { method: 'POST' },
+        );
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          this.toast(data.message || formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+        } else {
+          this.toast(data.message || 'Change applied', 'success');
+          if (this.selectedZone) {
+            await this.loadRecords();
+          }
+          await this.loadZones();
+        }
+        await this.loadScheduledChanges();
+        if (this.selectedScheduledChange?.id === id) {
+          await this.viewScheduledChange(id);
+        }
+      } catch (e) {
+        this.toast((e as Error).message, 'error');
+      } finally {
+        this.saving = false;
+      }
+    },
+
+    async openRevertModal(this: ScheduledMethodContext, id: string) {
+      this.saving = true;
+      try {
+        const response = await api(
+          `${API_BASE}/scheduled-changes/${encodeURIComponent(id)}/revert-preview`,
+          this.apiKey,
+        );
+        const data = await response.json();
+        if (!response.ok) {
+          this.toast(formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          return;
+        }
+        this.revertPreview = data as RevertPreview;
+        this.showRevertModal = true;
+      } catch (e) {
+        this.toast((e as Error).message, 'error');
+      } finally {
+        this.saving = false;
+      }
+    },
+
+    closeRevertModal(this: ScheduledMethodContext) {
+      this.showRevertModal = false;
+      this.revertPreview = null;
+    },
+
+    async confirmRevertChange(this: ScheduledMethodContext) {
+      if (!this.revertPreview) return;
+      const id = this.revertPreview.change_id;
+      this.saving = true;
+      try {
+        const response = await api(
+          `${API_BASE}/scheduled-changes/${encodeURIComponent(id)}/revert`,
+          this.apiKey,
+          { method: 'POST' },
+        );
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          this.toast(data.message || formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          return;
+        }
+        this.toast(data.message || 'Change reverted', 'success');
+        this.closeRevertModal();
+        if (this.selectedZone) {
+          await this.loadRecords();
+        }
+        await this.loadZones();
+        await this.loadScheduledChanges();
+        if (this.selectedScheduledChange?.id === id) {
+          await this.viewScheduledChange(id);
+        }
+      } catch (e) {
+        this.toast((e as Error).message, 'error');
+      } finally {
+        this.saving = false;
+      }
+    },
+
+    async cancelScheduledChange(this: ScheduledMethodContext, id: string) {
+      if (!confirm('Cancel this scheduled change?')) return;
+      try {
+        const response = await api(
+          `${API_BASE}/scheduled-changes/${encodeURIComponent(id)}`,
+          this.apiKey,
+          { method: 'DELETE' },
+        );
+        if (!response.ok) {
+          const data = await response.json();
+          this.toast(formatDNSErrorWithRequestID(data, requestIDFromResponse(response)), 'error');
+          return;
+        }
+        this.toast('Change cancelled', 'success');
+        if (this.selectedScheduledChange?.id === id) {
+          this.selectedScheduledChange = null;
+          this.previewResult = null;
+          this.updateUrlFromState();
+        }
+        await this.loadScheduledChanges();
+      } catch (e) {
+        this.toast((e as Error).message, 'error');
+      }
+    },
+
+    statusBadgeClass(this: ScheduledMethodContext, status: ChangeStatus): string {
+      const map: Record<string, string> = {
+        draft: 'muted',
+        scheduled: 'info',
+        running: 'warning',
+        applied: 'success',
+        failed: 'error',
+        cancelled: 'muted',
+        expired: 'warning',
+        reverted: 'info',
+      };
+      return map[status] || 'muted';
+    },
+
+    editScheduledLocalFromSelected(this: ScheduledMethodContext): string {
+      return utcIsoToLocalDatetime(this.selectedScheduledChange?.scheduled_at);
+    },
+
+    /** Whether a change can still be edited, previewed, applied or cancelled. */
+    isChangeEditable(this: ScheduledMethodContext, status: ChangeStatus): boolean {
+      return EDITABLE_STATUSES.includes(status);
+    },
+  };
+}

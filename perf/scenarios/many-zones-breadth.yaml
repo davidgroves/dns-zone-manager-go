@@ -1,0 +1,15 @@
+name: many-zones-breadth
+description: >
+  Stub: measure list/search latency and memory with a large number of small
+  zones (breadth over depth). Provision N zones with a handful of RRsets each,
+  then walk /v1/zones and random zone rrset lists under moderate concurrency.
+zone: null
+provision: true
+intent:
+  zone_count: 500
+  rrsets_per_zone: 10
+  concurrency: 20
+  duration_seconds: 120
+notes:
+  - Not wired to the loadgen yet; documents the intended scenario.
+  - Pair with catalog auto-load when testing discovery fan-out.

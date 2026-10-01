@@ -1,0 +1,6 @@
+tsig_keys:
+  - name: update-key
+    secret: abc=
+dns:
+  server: bind
+  update_tsig_key: missing-key

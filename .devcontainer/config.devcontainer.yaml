@@ -1,0 +1,115 @@
+# DNS Zone Manager - Devcontainer Configuration
+# ==============================================
+# Use this configuration when running inside the devcontainer.
+# BIND runs in a sibling container accessible at hostname 'bind'.
+#
+# Usage:
+#   go run ./cmd/dns-zone-manager serve --config .devcontainer/config.devcontainer.yaml
+
+# =============================================================================
+# TSIG Keys (referenced by name from dns and notify sections)
+# =============================================================================
+tsig_keys:
+  - name: dns-api-key
+    secret: K8vC2mP9nQ4rT6wX1yB3fG5hJ7kL0mN2pR4sU6vW8xY=
+    algorithm: hmac-sha256
+
+# DNS Server - connects to BIND container.
+# Uses the Compose service name "bind"; the API resolves it to the
+# container's current IP at startup, so no static network/IP is required.
+dns:
+  server: bind
+  port: 15353
+  timeout: 10.0
+  axfr_timeout: 60.0
+  pool_size: 64
+  update_tsig_key: dns-api-key
+
+# No authentication in the devcontainer — anonymous access is intentional.
+# Re-enable api_key / proxy_auth here if you need to exercise them.
+api_key:
+  enabled: false
+
+# Cache Configuration
+cache:
+  enabled: true
+  min_refresh_interval: 60
+  max_refresh_interval: 86400
+  serial_refresh_debounce: 2s
+
+# Catalog Zone Configuration
+catalog:
+  enabled: true
+  zone_name: catalog.example.
+  poll_interval: 60
+  notify_bind_address: 0.0.0.0
+  notify_udp_port: 15355
+  notify_tcp_port: 15355
+  auto_load_zones: true
+  remove_stale_zones: false
+
+# NOTIFY Listener Configuration (for zone change notifications from BIND)
+notify:
+  enabled: false
+  bind_address: 0.0.0.0
+  udp_port: 15354
+  tcp_port: 15354
+  prefer_ixfr: true
+  require_tsig: false
+
+# Persistence for scheduled changes and the audit log.
+# PostgreSQL runs in a sibling container reachable at hostname 'postgres'. Its
+# data is in tmpfs, so each devcontainer restart starts from an empty database
+# and the schema is recreated automatically.
+database:
+  backend: postgres
+  auto_migrate: true
+  postgres:
+    host: postgres
+    port: 5432
+    database: dns_zone_manager
+    user: dns_zone_manager
+    password: devpassword
+    sslmode: disable
+# To develop against SQLite instead, replace the block above with:
+# database:
+#   backend: sqlite
+#   path: .tmp/scheduler.db
+
+# Scheduled Changes (intent store; storage configured under 'database' above)
+scheduler:
+  enabled: true
+  poll_interval: 5
+  max_attempts: 3
+  retry_backoff: 30
+  lease_ttl: 120
+  default_expiry_window: 3600
+
+# Outbound change webhooks (Slack / Teams / generic)
+# Enabled with no targets: manual changes are recorded in the scheduler store
+# (so the Manual source filter and change links work) but nothing is delivered,
+# which keeps local development free of retries against unreachable endpoints.
+# Add a target below to exercise real delivery.
+webhooks:
+  enabled: false
+  base_url: http://localhost:5173
+  # targets:
+  #   - name: local-sink
+  #     type: generic
+  #     url: http://localhost:9099/hook
+  #     allow_insecure: true
+  #     auth:
+  #       type: hmac
+  #       secret: dev-signing-secret
+
+# Logging - use text format for local development (human-readable)
+logging:
+  format: json
+  level: INFO
+  sample_rate: 1.0
+  slow_threshold_ms: 1000
+  # Ship logs to Loki via grafana/otel-lgtm (compose service `lgtm`)
+  otlp_endpoint: http://lgtm:4318
+
+# Enable debug mode
+debug: true

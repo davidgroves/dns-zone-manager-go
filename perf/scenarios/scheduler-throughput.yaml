@@ -1,0 +1,16 @@
+name: scheduler-throughput
+description: >
+  Stub: enqueue many scheduled changes (draft → approved → due) and measure
+  apply throughput, lease contention, and audit write cost against SQLite or
+  Postgres.
+zone: perf5m.test
+provision: false
+require_zone: true
+intent:
+  changes: 1000
+  ops_per_change: 5
+  workers: 4
+  poll_interval_ms: 100
+notes:
+  - Not wired to the loadgen yet; documents the intended scenario.
+  - Compare sqlite vs postgres backends when implemented.

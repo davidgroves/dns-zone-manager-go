@@ -1,0 +1,95 @@
+version: 2
+
+project_name: dns-zone-manager
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: dns-zone-manager
+    main: ./cmd/dns-zone-manager
+    binary: dns-zone-manager
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/davidgroves/dns-zone-manager-go/internal/version.Version={{.Version}}
+
+  - id: dns-cli
+    main: ./cmd/dns-cli
+    binary: dns-cli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/davidgroves/dns-zone-manager-go/internal/version.Version={{.Version}}
+
+archives:
+  - id: default
+    builds:
+      - dns-zone-manager
+      - dns-cli
+    format: tar.gz
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+
+checksum:
+  name_template: checksums.txt
+
+dockers:
+  - id: amd64
+    ids:
+      - dns-zone-manager
+      - dns-cli
+    goos: linux
+    goarch: amd64
+    image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/dns-zone-manager:{{ .Version }}-amd64'
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/dns-zone-manager:latest-amd64'
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    build_flag_templates:
+      - '--platform=linux/amd64'
+
+  - id: arm64
+    ids:
+      - dns-zone-manager
+      - dns-cli
+    goos: linux
+    goarch: arm64
+    image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/dns-zone-manager:{{ .Version }}-arm64'
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/dns-zone-manager:latest-arm64'
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    build_flag_templates:
+      - '--platform=linux/arm64'
+
+docker_manifests:
+  - name_template: 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/dns-zone-manager:{{ .Version }}'
+    image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/dns-zone-manager:{{ .Version }}-amd64'
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/dns-zone-manager:{{ .Version }}-arm64'
+  - name_template: 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/dns-zone-manager:latest'
+    image_templates:
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/dns-zone-manager:latest-amd64'
+      - 'ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/dns-zone-manager:latest-arm64'
+
+release:
+  draft: false
+  prerelease: auto
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'

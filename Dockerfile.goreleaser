@@ -1,0 +1,8 @@
+# Minimal Dockerfile used by GoReleaser after binaries are built.
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY dns-zone-manager /dns-zone-manager
+COPY dns-cli /dns-cli
+EXPOSE 8000
+USER nonroot:nonroot
+ENTRYPOINT ["/dns-zone-manager"]
+CMD ["serve"]

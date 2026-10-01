@@ -1,0 +1,9 @@
+dns:
+  server: 127.0.0.1
+database:
+  backend: postgres
+  postgres:
+    host: db.example.com
+    database: dns
+    user: dns
+    password: s3cret
