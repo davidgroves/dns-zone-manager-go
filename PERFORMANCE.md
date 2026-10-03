@@ -39,14 +39,3 @@ Application overhead ≈ HTTP histogram − DDNS histogram.
 4. Per-subscriber WebSocket outbox channels
 5. Durable webhook outbox drained in batches (off the request path)
 
-## Baseline table
-
-Fill after serious runs on a known host:
-
-| Scenario | Key metric | Result |
-| --- | --- | --- |
-| rapid-ddns-writes | achieved rps @ 500 target | |
-| rapid-api-writes | achieved rps @ 500 target | |
-| rapid-api-writes | p99 (http − ddns) ms | |
-| large-zone-load 5m | AXFR refresh (s) | |
-| websocket-fanout | messages @ 500 subs | |
