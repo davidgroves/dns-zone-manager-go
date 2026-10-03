@@ -22,7 +22,7 @@ dns:
   port: 15353
   timeout: 10.0
   axfr_timeout: 60.0
-  pool_size: 64
+  pool_size: 256
   update_tsig_key: dns-api-key
 
 # No authentication in the devcontainer — anonymous access is intentional.

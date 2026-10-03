@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -64,10 +65,23 @@ func listCmd() *cobra.Command {
 func runCmd(cfg *perfharness.Config) *cobra.Command {
 	var records int
 	var preset string
+	var rps []float64
+	var lowestRPS, highestRPS, stepRPS, stepAlias float64
+	var duration float64
+	var pdfPath string
+	var mdPath string
 	cmd := &cobra.Command{
 		Use:   "run <scenario|all|path.yaml>",
 		Short: "Run a named scenario",
-		Args:  cobra.ExactArgs(1),
+		Long: `Run a named scenario from perf/scenarios.
+
+Override offered write rate with --rps, or sweep with
+--lowest-rps / --highest-rps / --step-rps. Use --duration for each step.
+
+  ./perf.sh run writes-one-zone --lowest-rps 100 --highest-rps 1000 --step-rps 100 --duration 30
+  ./perf.sh run writes-many-zones --lowest-rps 100 --highest-rps 1000 --step-rps 100 --duration 30
+  ./perf.sh report --compare one.json many.json --pdf zone-compare.pdf`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			names := []string{args[0]}
 			if args[0] == "all" {
@@ -77,6 +91,21 @@ func runCmd(cfg *perfharness.Config) *cobra.Command {
 					return err
 				}
 			}
+			step := stepRPS
+			if stepAlias > 0 {
+				if step > 0 && step != stepAlias {
+					return fmt.Errorf("--step-rps (%g) and --step (%g) disagree", step, stepAlias)
+				}
+				step = stepAlias
+			}
+			ov := perfharness.RunOverrides{
+				Records: records, Preset: preset, RPS: append([]float64(nil), rps...),
+				LowestRPS: lowestRPS, HighestRPS: highestRPS, StepRPS: step, Duration: duration,
+			}
+			if err := perfharness.ResolveRateOverrides(&ov); err != nil {
+				return err
+			}
+			multi := len(names) > 1
 			failed := false
 			for _, name := range names {
 				sc, err := perfharness.LoadScenario(name)
@@ -86,8 +115,19 @@ func runCmd(cfg *perfharness.Config) *cobra.Command {
 					continue
 				}
 				fmt.Fprintf(os.Stderr, "==> Running scenario: %s\n", sc.Name)
-				rep := perfharness.RunScenario(*cfg, sc, records, preset)
-				written, err := perfharness.WriteReport(rep)
+				if len(ov.RPS) > 0 {
+					fmt.Fprintf(os.Stderr, "    rps steps: %v", ov.RPS)
+					if ov.Duration > 0 {
+						fmt.Fprintf(os.Stderr, " (duration %.0fs)", ov.Duration)
+					}
+					fmt.Fprintln(os.Stderr)
+				}
+				rep := perfharness.RunScenario(*cfg, sc, ov)
+				opts := perfharness.WriteOptions{
+					PDFPath: pathForScenario(pdfPath, sc.Name, multi),
+					MDPath:  pathForScenario(mdPath, sc.Name, multi),
+				}
+				written, err := perfharness.WriteReport(rep, opts)
 				if err != nil {
 					return err
 				}
@@ -105,12 +145,21 @@ func runCmd(cfg *perfharness.Config) *cobra.Command {
 	}
 	cmd.Flags().IntVar(&records, "records", 0, "Override provision size")
 	cmd.Flags().StringVar(&preset, "preset", "", "Override provision preset (100k, 1m, 5m)")
+	cmd.Flags().Float64SliceVar(&rps, "rps", nil, "Override target RPS; replaces scenario load steps")
+	cmd.Flags().Float64Var(&lowestRPS, "lowest-rps", 0, "Start of rate sweep (inclusive)")
+	cmd.Flags().Float64Var(&highestRPS, "highest-rps", 0, "End of rate sweep (inclusive)")
+	cmd.Flags().Float64Var(&stepRPS, "step-rps", 0, "Increment between rates")
+	cmd.Flags().Float64Var(&stepAlias, "step", 0, "Alias for --step-rps")
+	cmd.Flags().Float64Var(&duration, "duration", 0, "Override step duration in seconds")
+	cmd.Flags().StringVar(&pdfPath, "pdf", "", "Write the PDF report to this path")
+	cmd.Flags().StringVar(&mdPath, "markdown", "", "Write the Markdown report to this path")
 	return cmd
 }
 
 func reportCmd() *cobra.Command {
 	var compareFirst string
 	var pdfPath string
+	var mdPath string
 	cmd := &cobra.Command{
 		Use:   "report [path.json]",
 		Short: "Render or compare saved reports",
@@ -133,7 +182,22 @@ func reportCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				fmt.Print(perfharness.CompareReports(a, b))
+				md := perfharness.CompareReports(a, b)
+				fmt.Print(md)
+				if mdPath != "" {
+					if err := os.WriteFile(mdPath, []byte(md), 0o644); err != nil {
+						return err
+					}
+					fmt.Fprintf(os.Stderr, "Wrote %s\n", mdPath)
+				}
+				out := pdfPath
+				if out == "" {
+					out = filepath.Join(perfharness.ResultsDir(), "compare.pdf")
+				}
+				if err := perfharness.WriteComparePDF(out, a, b); err != nil {
+					return err
+				}
+				fmt.Fprintf(os.Stderr, "Wrote %s\n", out)
 				return nil
 			}
 			path := filepath.Join(perfharness.ResultsDir(), "latest.json")
@@ -144,7 +208,14 @@ func reportCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("report not found: %s", path)
 			}
-			fmt.Print(perfharness.RenderMarkdown(data))
+			md := perfharness.RenderMarkdown(data)
+			fmt.Print(md)
+			if mdPath != "" {
+				if err := os.WriteFile(mdPath, []byte(md), 0o644); err != nil {
+					return err
+				}
+				fmt.Fprintf(os.Stderr, "Wrote %s\n", mdPath)
+			}
 			out := pdfPath
 			if out == "" {
 				out = pdfBeside(path)
@@ -157,8 +228,21 @@ func reportCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&compareFirst, "compare", "", "Compare this JSON report with the next argument")
-	cmd.Flags().StringVar(&pdfPath, "pdf", "", "Write the PDF to this path (default: next to the JSON)")
+	cmd.Flags().StringVar(&pdfPath, "pdf", "", "Write the PDF to this path")
+	cmd.Flags().StringVar(&mdPath, "markdown", "", "Write Markdown to this path")
 	return cmd
+}
+
+func pathForScenario(path, scenario string, multi bool) string {
+	if path == "" {
+		return ""
+	}
+	if !multi {
+		return path
+	}
+	ext := filepath.Ext(path)
+	base := strings.TrimSuffix(path, ext)
+	return base + "-" + scenario + ext
 }
 
 func zoneCmd(cfg *perfharness.Config) *cobra.Command {

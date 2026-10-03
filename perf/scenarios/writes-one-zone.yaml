@@ -1,5 +1,7 @@
 name: writes-one-zone
-description: 500 API changes/s for 30s, all against one zone (test.local).
+description: >
+  API write sweep against a single zone (test.local). Pair with writes-many-zones
+  at the same rates to show BIND serializing per-zone updates.
 zone: test.local
 provision: false
 require_zone: true
@@ -9,6 +11,15 @@ load:
   pool_size: 2000
   readers: false
   steps:
-    - { rps: 500, duration: 30, label: "one-zone@500" }
+    - { rps: 100, duration: 30, label: "one@100" }
+    - { rps: 200, duration: 30, label: "one@200" }
+    - { rps: 300, duration: 30, label: "one@300" }
+    - { rps: 400, duration: 30, label: "one@400" }
+    - { rps: 500, duration: 30, label: "one@500" }
+    - { rps: 600, duration: 30, label: "one@600" }
+    - { rps: 700, duration: 30, label: "one@700" }
+    - { rps: 800, duration: 30, label: "one@800" }
+    - { rps: 900, duration: 30, label: "one@900" }
+    - { rps: 1000, duration: 30, label: "one@1000" }
 notes:
   - Every change updates test.local. Compare with writes-many-zones.

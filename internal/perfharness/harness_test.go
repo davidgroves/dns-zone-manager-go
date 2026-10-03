@@ -127,10 +127,36 @@ func TestPDFContainsScenario(t *testing.T) {
 	if !strings.HasPrefix(text, "%PDF-") {
 		t.Fatalf("not a pdf: %q", text[:20])
 	}
-	for _, want := range []string{"writes-one-zone", "Did not hold the offered rate", "one-zone@500"} {
+	for _, want := range []string{"writes-one-zone", "Did not hold the offered rate", "one-zone@500", "Throughput"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("pdf missing %q", want)
 		}
+	}
+}
+
+func TestCompareReportsMatchesByTarget(t *testing.T) {
+	a := map[string]any{
+		"scenario":   "writes-one-zone",
+		"started_at": "2026-10-03T14:00:00Z",
+		"steps": []any{
+			map[string]any{"label": "one@100", "target_rps": 100.0, "achieved_rps": 100.0,
+				"writers": map[string]any{"p99_ms": 5.0}},
+		},
+	}
+	b := map[string]any{
+		"scenario":   "writes-many-zones",
+		"started_at": "2026-10-03T14:10:00Z",
+		"steps": []any{
+			map[string]any{"label": "many@100", "target_rps": 100.0, "achieved_rps": 100.0,
+				"writers": map[string]any{"p99_ms": 6.0}},
+		},
+	}
+	md := CompareReports(a, b)
+	if !strings.Contains(md, "| 100 | 100.0 | 100.0 |") {
+		t.Fatalf("compare markdown = %s", md)
+	}
+	if strings.Contains(md, "one@100") {
+		t.Fatalf("still keyed by label: %s", md)
 	}
 }
 
@@ -152,7 +178,7 @@ func TestListScenarios(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sc.Load == nil || len(sc.Load.Zones) < 2 || sc.Load.Steps[0].RPS != 500 {
+	if sc.Load == nil || len(sc.Load.Zones) < 2 || sc.Load.Steps[0].RPS != 100 {
 		t.Fatalf("scenario = %+v", sc.Load)
 	}
 }

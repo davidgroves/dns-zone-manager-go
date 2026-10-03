@@ -3,6 +3,7 @@ package perfharness
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"os/exec"
@@ -92,8 +93,118 @@ func LoadScenario(name string) (Scenario, error) {
 	return sc, nil
 }
 
+// RunOverrides are CLI overrides for a scenario run.
+type RunOverrides struct {
+	Records    int
+	Preset     string
+	RPS        []float64
+	LowestRPS  float64
+	HighestRPS float64
+	StepRPS    float64
+	Duration   float64
+}
+
+// BuildRPSRange returns inclusive rates from lowest to highest by step.
+func BuildRPSRange(lowest, highest, step float64) ([]float64, error) {
+	if lowest <= 0 || highest <= 0 || step <= 0 {
+		return nil, fmt.Errorf("--lowest-rps, --highest-rps, and --step-rps must all be > 0")
+	}
+	if highest < lowest {
+		return nil, fmt.Errorf("--highest-rps (%g) must be >= --lowest-rps (%g)", highest, lowest)
+	}
+	n := int(math.Floor((highest-lowest)/step+1e-9)) + 1
+	if n > 500 {
+		return nil, fmt.Errorf("rate sweep would produce %d steps (max 500); widen --step-rps", n)
+	}
+	out := make([]float64, 0, n)
+	for i := 0; ; i++ {
+		rate := lowest + float64(i)*step
+		if rate > highest+step*1e-9 {
+			break
+		}
+		if rate > highest {
+			rate = highest
+		}
+		out = append(out, rate)
+		if rate >= highest-1e-9 {
+			break
+		}
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("rate sweep produced no steps")
+	}
+	last := out[len(out)-1]
+	if math.Abs(last-highest) > 1e-6 {
+		out = append(out, highest)
+	}
+	return out, nil
+}
+
+func floatSlicesEqual(a, b []float64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if math.Abs(a[i]-b[i]) > 1e-6 {
+			return false
+		}
+	}
+	return true
+}
+
+// ResolveRateOverrides expands --lowest-rps/--highest-rps/--step-rps into RPS.
+func ResolveRateOverrides(ov *RunOverrides) error {
+	hasRange := ov.LowestRPS > 0 || ov.HighestRPS > 0 || ov.StepRPS > 0
+	if !hasRange {
+		return nil
+	}
+	rates, err := BuildRPSRange(ov.LowestRPS, ov.HighestRPS, ov.StepRPS)
+	if err != nil {
+		return err
+	}
+	if len(ov.RPS) > 0 && !floatSlicesEqual(ov.RPS, rates) {
+		return fmt.Errorf("--rps cannot be combined with --lowest-rps/--highest-rps/--step-rps")
+	}
+	ov.RPS = rates
+	return nil
+}
+
+// ApplyLoadRateOverride replaces scenario load steps with ov.RPS.
+func ApplyLoadRateOverride(sc *Scenario, ov RunOverrides) error {
+	if len(ov.RPS) == 0 {
+		return nil
+	}
+	if sc.Load == nil {
+		return fmt.Errorf("--rps requires a scenario with a load block")
+	}
+	for _, rate := range ov.RPS {
+		if rate <= 0 {
+			return fmt.Errorf("--rps values must be > 0 (got %g)", rate)
+		}
+	}
+	baseDur := ov.Duration
+	if baseDur <= 0 {
+		switch {
+		case len(sc.Load.Steps) > 0 && sc.Load.Steps[0].Duration > 0:
+			baseDur = sc.Load.Steps[0].Duration
+		case sc.Load.Duration > 0:
+			baseDur = sc.Load.Duration
+		default:
+			baseDur = 60
+		}
+	}
+	steps := make([]StepSpec, len(ov.RPS))
+	for i, rate := range ov.RPS {
+		steps[i] = StepSpec{RPS: rate, Duration: baseDur}
+	}
+	sc.Load.Steps = steps
+	sc.Load.RPS = 0
+	sc.Load.Duration = 0
+	return nil
+}
+
 // RunScenario executes one scenario and returns the report. It does not write files.
-func RunScenario(cfg Config, sc Scenario, recordsOverride int, presetOverride string) Report {
+func RunScenario(cfg Config, sc Scenario, ov RunOverrides) Report {
 	zone := sc.Zone
 	if zone == "" {
 		zone = DefaultZone
@@ -108,8 +219,14 @@ func RunScenario(cfg Config, sc Scenario, recordsOverride int, presetOverride st
 	var provision map[string]any
 	var steps []StepResult
 
+	if err := ResolveRateOverrides(&ov); err != nil {
+		errors = append(errors, err.Error())
+	} else if err := ApplyLoadRateOverride(&sc, ov); err != nil {
+		errors = append(errors, err.Error())
+	}
+
 	if sc.Provision {
-		count, err := recordsFor(sc, recordsOverride, presetOverride)
+		count, err := recordsFor(sc, ov.Records, ov.Preset)
 		if err != nil {
 			errors = append(errors, err.Error())
 		} else {
@@ -140,7 +257,7 @@ func RunScenario(cfg Config, sc Scenario, recordsOverride int, presetOverride st
 
 	blocked := false
 	for _, e := range errors {
-		if strings.Contains(e, "not loaded") {
+		if strings.Contains(e, "not loaded") || strings.Contains(e, "--rps") || strings.Contains(e, "--lowest-rps") {
 			blocked = true
 			break
 		}
@@ -185,16 +302,34 @@ func RunScenario(cfg Config, sc Scenario, recordsOverride int, presetOverride st
 		probeAfter["serial_lag"] = lag
 	}
 
+	cfgMap := map[string]any{
+		"zone":     zone,
+		"api_base": cfg.APIBase,
+		"bind":     fmt.Sprintf("%s:%d", cfg.BindHost, cfg.BindPort),
+	}
+	if sc.Load != nil && len(sc.Load.Zones) > 0 {
+		cfgMap["zones"] = len(TargetZones(zone, sc.Load.Zones))
+	} else {
+		cfgMap["zones"] = 1
+	}
+	if len(ov.RPS) > 0 {
+		cfgMap["rps"] = ov.RPS
+		if ov.Duration > 0 {
+			cfgMap["duration"] = ov.Duration
+		}
+	}
+	if ov.LowestRPS > 0 && ov.HighestRPS > 0 && ov.StepRPS > 0 {
+		cfgMap["lowest_rps"] = ov.LowestRPS
+		cfgMap["highest_rps"] = ov.HighestRPS
+		cfgMap["step_rps"] = ov.StepRPS
+	}
+
 	return Report{
-		Scenario:   sc.Name,
-		StartedAt:  started,
-		FinishedAt: time.Now().UTC().Format(time.RFC3339Nano),
-		Host:       hostInfo(),
-		Config: map[string]any{
-			"zone":     zone,
-			"api_base": cfg.APIBase,
-			"bind":     fmt.Sprintf("%s:%d", cfg.BindHost, cfg.BindPort),
-		},
+		Scenario:     sc.Name,
+		StartedAt:    started,
+		FinishedAt:   time.Now().UTC().Format(time.RFC3339Nano),
+		Host:         hostInfo(),
+		Config:       cfgMap,
 		Steps:        steps,
 		Provision:    provision,
 		Probes:       map[string]any{"before": probeBefore, "after": probeAfter},

@@ -10,9 +10,12 @@ Python capped near ~200 REST writes/s. Target for this codebase: BIND is the
 limit. Measure with:
 
 ```bash
-./perf.sh run rapid-api-writes
-./perf.sh run writes-one-zone     # 500/s, all changes in test.local
-./perf.sh run writes-many-zones   # 500/s, round-robin across 25 small zones
+# Single-zone vs many-zone API write sweep (100–1000/s, 30s steps)
+./perf.sh run writes-one-zone --pdf perf/results/one-zone.pdf
+./perf.sh run writes-many-zones --pdf perf/results/many-zones.pdf
+./perf.sh report --compare perf/results/one-zone.json perf/results/many-zones.json \
+  --pdf perf/results/zone-compare.pdf
+
 ./perf.sh run rapid-ddns-writes   # baseline: BIND alone
 ./perf.sh run mixed-read-write
 ./perf.sh run websocket-fanout

@@ -61,8 +61,22 @@ type Written struct {
 	PDF  string
 }
 
+// WriteOptions selects optional output paths for Markdown and PDF.
+type WriteOptions struct {
+	PDFPath string
+	MDPath  string
+}
+
+func mkdirParent(path string) error {
+	dir := filepath.Dir(path)
+	if dir == "" || dir == "." {
+		return nil
+	}
+	return os.MkdirAll(dir, 0o755)
+}
+
 // WriteReport writes JSON, Markdown, and PDF, and refreshes the latest.* copies.
-func WriteReport(rep Report) (Written, error) {
+func WriteReport(rep Report, opts WriteOptions) (Written, error) {
 	dir := ResultsDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return Written{}, err
@@ -87,6 +101,18 @@ func WriteReport(rep Report) (Written, error) {
 		MD:   filepath.Join(dir, slug+".md"),
 		PDF:  filepath.Join(dir, slug+".pdf"),
 	}
+	if opts.MDPath != "" {
+		out.MD = opts.MDPath
+	}
+	if opts.PDFPath != "" {
+		out.PDF = opts.PDFPath
+	}
+	if err := mkdirParent(out.MD); err != nil {
+		return Written{}, err
+	}
+	if err := mkdirParent(out.PDF); err != nil {
+		return Written{}, err
+	}
 	if err := os.WriteFile(out.JSON, data, 0o644); err != nil {
 		return Written{}, err
 	}
@@ -95,6 +121,12 @@ func WriteReport(rep Report) (Written, error) {
 	}
 	if err := os.WriteFile(out.PDF, pdfBytes, 0o644); err != nil {
 		return Written{}, err
+	}
+	if opts.MDPath != "" {
+		_ = os.WriteFile(filepath.Join(dir, slug+".md"), []byte(md), 0o644)
+	}
+	if opts.PDFPath != "" {
+		_ = os.WriteFile(filepath.Join(dir, slug+".pdf"), pdfBytes, 0o644)
 	}
 	_ = os.WriteFile(filepath.Join(dir, "latest.json"), data, 0o644)
 	_ = os.WriteFile(filepath.Join(dir, "latest.md"), []byte(md), 0o644)
@@ -281,37 +313,21 @@ func CompareReports(a, b map[string]any) string {
 		fmt.Sprintf("- A: `%v`", a["started_at"]),
 		fmt.Sprintf("- B: `%v`", b["started_at"]),
 		"",
-		"| Step | A rps | B rps | Δ rps | A p99 | B p99 | Δ p99 |",
+		"| Target | A rps | B rps | Δ rps | A p99 | B p99 | Δ p99 |",
 		"| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
 	}
 	stepsA := stepsByLabel(a["steps"])
 	stepsB := stepsByLabel(b["steps"])
-	seen := map[string]struct{}{}
-	var labels []string
-	for _, s := range append(append([]map[string]any{}, stepsA...), stepsB...) {
-		label := fmt.Sprint(s["label"])
-		if _, ok := seen[label]; ok {
-			continue
-		}
-		seen[label] = struct{}{}
-		labels = append(labels, label)
-	}
-	byA := map[string]map[string]any{}
-	byB := map[string]map[string]any{}
-	for _, s := range stepsA {
-		byA[fmt.Sprint(s["label"])] = s
-	}
-	for _, s := range stepsB {
-		byB[fmt.Sprint(s["label"])] = s
-	}
-	for _, label := range labels {
-		sa, sb := byA[label], byB[label]
+	byA := stepByTarget(stepsA)
+	byB := stepByTarget(stepsB)
+	for _, target := range sortedTargets(stepsA, stepsB) {
+		sa, sb := byA[target], byB[target]
 		ra, _ := asFloat(sa["achieved_rps"])
 		rb, _ := asFloat(sb["achieved_rps"])
 		pa, _ := asFloat(asMap(sa["writers"])["p99_ms"])
 		pb, _ := asFloat(asMap(sb["writers"])["p99_ms"])
-		lines = append(lines, fmt.Sprintf("| %s | %.1f | %.1f | %+.1f | %.1f | %.1f | %+.1f |",
-			label, ra, rb, rb-ra, pa, pb, pb-pa))
+		lines = append(lines, fmt.Sprintf("| %.0f | %.1f | %.1f | %+.1f | %.1f | %.1f | %+.1f |",
+			target, ra, rb, rb-ra, pa, pb, pb-pa))
 	}
 	lines = append(lines, "")
 	return strings.Join(lines, "\n")

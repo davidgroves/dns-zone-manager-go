@@ -68,7 +68,23 @@ func renderPDF(data map[string]any) ([]byte, error) {
 	pdf.CellFormat(pdfWidth, 8, "  "+pdfSafe(banner), "", 1, "L", true, 0, "")
 	pdf.Ln(4)
 
-	drawStepTable(pdf, stepsByLabel(data["steps"]))
+	drawKPICards(pdf, stepsByLabel(data["steps"]))
+	pdf.Ln(4)
+
+	steps := stepsByLabel(data["steps"])
+	if len(steps) > 0 {
+		ensureSpace(pdf, 78)
+		drawGroupedBarChart(pdf, "Throughput: target vs achieved (requests/s)", steps, throughputSeries())
+		pdf.Ln(6)
+		ensureSpace(pdf, 78)
+		drawLatencyScalingChart(pdf, steps)
+		pdf.Ln(6)
+		ensureSpace(pdf, 55)
+		drawAttainmentChart(pdf, steps)
+		pdf.Ln(5)
+	}
+
+	drawStepTable(pdf, steps)
 	pdf.Ln(5)
 
 	if delta, ok := data["metrics_delta"].(map[string]any); ok {

@@ -1,5 +1,5 @@
 name: writes-many-zones
-description: 500 API changes/s for 30s, round-robin across the 25 small catalog zones.
+description: API write sweep round-robin across the 25 small catalog zones.
 zone: alpha.test
 provision: false
 require_zone: true
@@ -35,6 +35,15 @@ load:
     - omega.test
     - final.test
   steps:
-    - { rps: 500, duration: 30, label: "many-zones@500" }
+    - { rps: 100, duration: 30, label: "many@100" }
+    - { rps: 200, duration: 30, label: "many@200" }
+    - { rps: 300, duration: 30, label: "many@300" }
+    - { rps: 400, duration: 30, label: "many@400" }
+    - { rps: 500, duration: 30, label: "many@500" }
+    - { rps: 600, duration: 30, label: "many@600" }
+    - { rps: 700, duration: 30, label: "many@700" }
+    - { rps: 800, duration: 30, label: "many@800" }
+    - { rps: 900, duration: 30, label: "many@900" }
+    - { rps: 1000, duration: 30, label: "many@1000" }
 notes:
-  - Same rate and record shape as writes-one-zone. Each change goes to the next zone.
+  - Same rates and record shape as writes-one-zone. Each change goes to the next zone.

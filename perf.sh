@@ -5,7 +5,9 @@
 #   ./perf.sh zone create [--preset 5m|1m|100k] [--records N] [--zone NAME]
 #   ./perf.sh zone destroy [--zone NAME] [--delete-file]
 #   ./perf.sh zone generate [--preset 100k] [--output PATH]
-#   ./perf.sh run <scenario|all> [--preset 100k]
+#   ./perf.sh run <scenario|all> [--lowest-rps N --highest-rps N --step-rps N] [--duration 30]
+#                                [--pdf out.pdf] [--markdown out.md]
+#   ./perf.sh report --compare one.json many.json --pdf compare.pdf
 #   ./perf.sh report [path.json] [--pdf out.pdf] [--compare A.json B.json]
 #   ./perf.sh list
 #
