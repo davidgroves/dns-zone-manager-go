@@ -57,10 +57,14 @@ export function createAuthMethods(_state: AppState) {
         if (response.ok) {
           purgeLegacyApiKeyStorage();
           if (this.apiKey) {
-            const sessionRes = await api(`${API_BASE}/auth/session`, this.apiKey, {
-              method: 'POST',
-              body: JSON.stringify({ remember: this.rememberApiKey }),
-            });
+            const sessionRes = await api(
+              `${API_BASE}/auth/session`,
+              this.apiKey,
+              {
+                method: 'POST',
+                body: JSON.stringify({ remember: this.rememberApiKey }),
+              },
+            );
             if (sessionRes.ok) {
               // Cookie carries the session; do not keep the API key in JS.
               this.apiKey = null;

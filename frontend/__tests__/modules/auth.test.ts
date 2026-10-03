@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createAuthMethods, purgeLegacyApiKeyStorage } from '../../modules/auth';
+import {
+  createAuthMethods,
+  purgeLegacyApiKeyStorage,
+} from '../../modules/auth';
 import type { AppState } from '../../types';
 
 describe('auth storage', () => {
