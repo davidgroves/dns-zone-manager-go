@@ -223,14 +223,10 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempt = 0;
 let intentionalClose = false;
 
-function buildWsUrl(zone: string, apiKey: string | null): string {
+function buildWsUrl(zone: string): string {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const path = `/v1/zones/${encodeURIComponent(zone)}/ws`;
-  const url = new URL(`${proto}//${window.location.host}${path}`);
-  if (apiKey) {
-    url.searchParams.set('api_key', apiKey);
-  }
-  return url.toString();
+  return `${proto}//${window.location.host}${path}`;
 }
 
 export function createLiveMethods(_state: AppState) {
@@ -317,7 +313,7 @@ export function createLiveMethods(_state: AppState) {
 
       const open = () => {
         if (activeZone !== normalized) return;
-        const url = buildWsUrl(normalized, this.apiKey);
+        const url = buildWsUrl(normalized);
         const ws = new WebSocket(url);
         activeSocket = ws;
 

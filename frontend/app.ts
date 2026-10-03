@@ -5,7 +5,7 @@ import {
 } from './api/client';
 import { createAtomicMethods } from './modules/atomic';
 import { createAuditMethods } from './modules/audit';
-import { createAuthMethods, readStoredApiKey } from './modules/auth';
+import { createAuthMethods } from './modules/auth';
 import { createHistoryMethods } from './modules/history';
 import { createLiveMethods } from './modules/live';
 import { createNsupdateMethods } from './modules/nsupdate';
@@ -67,6 +67,7 @@ type AlpineThis = AppState & {
   // Methods
   updatePageSizesFromMode: () => void;
   validateAndSetAuth: () => Promise<void>;
+  restoreSession: () => Promise<boolean>;
   trackLogin: (type: string) => Promise<void>;
   loadZones: () => Promise<void>;
   navigateToRoute: (route: RouteParams) => Promise<void>;
@@ -399,7 +400,7 @@ export function createApp(config: AppConfig) {
 
       // Fetch UI config from API (for decoupled frontend)
       try {
-        const response = await fetch('/ui/config');
+        const response = await fetch('/ui/config', { credentials: 'include' });
         if (response.ok) {
           const uiConfig = await response.json();
           self.apiKeyEnabled = uiConfig.apiKeyEnabled ?? true;
@@ -441,15 +442,8 @@ export function createApp(config: AppConfig) {
         return;
       }
 
-      // Check for stored API key (sessionStorage first, then localStorage)
-      const storedKey = readStoredApiKey();
-      if (storedKey) {
-        self.apiKey = storedKey;
-        self.rememberApiKey =
-          localStorage.getItem('dns_zone_manager_api_key') === storedKey;
-        // validateAndSetAuth will call navigateToRoute if successful
-        await self.validateAndSetAuth();
-      }
+      // Restore HttpOnly session cookie; never read an API key from Web Storage.
+      await self.restoreSession();
       // If not authenticated, the login screen will be shown
       // intendedRoute is preserved so we can navigate after login
     },

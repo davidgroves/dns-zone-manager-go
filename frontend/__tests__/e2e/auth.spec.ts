@@ -10,6 +10,7 @@ import { backendRequiresLogin, ensureLoggedIn } from './helpers';
 
 test.describe('Authentication', () => {
   test.beforeEach(async ({ page }) => {
+    await page.context().clearCookies();
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.reload();

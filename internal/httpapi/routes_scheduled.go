@@ -20,7 +20,7 @@ type schedOpBody struct {
 	Name    string   `json:"name"`
 	Type    string   `json:"type"`
 	RDClass string   `json:"rdclass,omitempty"`
-	TTL     int      `json:"ttl,omitempty"`
+	TTL     uint32   `json:"ttl,omitempty"`
 	Records []string `json:"records,omitempty"`
 }
 

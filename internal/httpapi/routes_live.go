@@ -34,10 +34,17 @@ func serveWS(w http.ResponseWriter, r *http.Request, d *Deps, zone string) {
 			return
 		}
 	}
-	if _, _, err := live.AuthenticateWSRequest(r, d.Settings); err != nil {
+	r = live.WithAPIKeyQuery(r, d.Settings)
+	if d.Auth == nil {
 		http.Error(w, "authentication required", http.StatusUnauthorized)
 		return
 	}
+	_, nr, err := d.Auth.AuthenticateRequest(r)
+	if err != nil {
+		http.Error(w, "authentication required", http.StatusUnauthorized)
+		return
+	}
+	r = nr
 
 	clientIP := r.RemoteAddr
 	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {

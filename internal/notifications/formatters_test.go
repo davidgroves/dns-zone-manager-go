@@ -22,7 +22,7 @@ func sampleEvent() notifications.DnsChangeEvent {
 				Name:    "www.test.example.",
 				RDType:  "A",
 				RDClass: "IN",
-				TTL:     ptr(300),
+				TTL:     ptr(uint32(300)),
 				Records: []string{"10.0.0.1"},
 			},
 		},

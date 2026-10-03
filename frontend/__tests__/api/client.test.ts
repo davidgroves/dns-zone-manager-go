@@ -24,6 +24,7 @@ describe('api', () => {
     await api('/zones', null);
 
     expect(mockFetch).toHaveBeenCalledWith('/zones', {
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -36,6 +37,7 @@ describe('api', () => {
     await api('/zones', 'test-api-key');
 
     expect(mockFetch).toHaveBeenCalledWith('/zones', {
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': 'test-api-key',
@@ -63,6 +65,7 @@ describe('api', () => {
     expect(mockFetch).toHaveBeenCalledWith('/zones', {
       method: 'POST',
       body: JSON.stringify({ name: 'test' }),
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': 'key',
@@ -80,6 +83,7 @@ describe('api', () => {
     });
 
     expect(mockFetch).toHaveBeenCalledWith('/zones', {
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'X-API-Key': 'key',

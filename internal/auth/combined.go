@@ -27,10 +27,11 @@ func (u User) Zero() bool {
 	return u.ID == "" && u.AuthType == ""
 }
 
-// Combined tries trusted proxy headers first, then API key.
+// Combined tries trusted proxy headers first, then API key, then a session cookie.
 type Combined struct {
-	APIKey config.APIKeySettings
-	Proxy  config.ProxyAuthSettings
+	APIKey   config.APIKeySettings
+	Proxy    config.ProxyAuthSettings
+	Sessions *SessionStore
 }
 
 // NewCombined builds a Combined authenticator from settings.
@@ -39,8 +40,9 @@ func NewCombined(settings *config.Settings) *Combined {
 		return &Combined{}
 	}
 	return &Combined{
-		APIKey: settings.APIKey,
-		Proxy:  settings.ProxyAuth,
+		APIKey:   settings.APIKey,
+		Proxy:    settings.ProxyAuth,
+		Sessions: defaultSessions,
 	}
 }
 
@@ -113,6 +115,13 @@ func (c *Combined) authenticate(r *http.Request) (User, error) {
 				return u, nil
 			}
 		}
+		if c.Sessions != nil {
+			if ck, err := r.Cookie(SessionCookieName); err == nil {
+				if u, ok := c.Sessions.Lookup(ck.Value); ok {
+					return u, nil
+				}
+			}
+		}
 	}
 
 	methods := make([]string, 0, 2)
@@ -128,7 +137,7 @@ func (c *Combined) authenticate(r *http.Request) (User, error) {
 		if h == "" {
 			h = "X-API-Key"
 		}
-		methods = append(methods, fmt.Sprintf("API Key (%s header)", h))
+		methods = append(methods, fmt.Sprintf("API Key (%s header) or session cookie", h))
 	}
 	return User{}, fmt.Errorf("%w. Supported methods: %s", ErrUnauthorized, strings.Join(methods, ", "))
 }

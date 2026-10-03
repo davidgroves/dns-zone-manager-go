@@ -19,7 +19,7 @@ type RevertOperation struct {
 	Name    string
 	Type    string
 	RDClass string
-	TTL     int
+	TTL     uint32
 	Records []string
 }
 
@@ -49,7 +49,7 @@ func CapturePriorState(zone string, operations []store.ScheduledOperation, cache
 			})
 			continue
 		}
-		ttl := int(info.TTL)
+		ttl := info.TTL
 		recs := append([]string(nil), info.Records...)
 		snapshots = append(snapshots, store.OpSnapshot{
 			Seq:          seq,
@@ -175,7 +175,7 @@ func RevertOpsToAtomic(operations []RevertOperation) []dnsx.Operation {
 			Name:    op.Name,
 			Type:    op.Type,
 			Class:   op.RDClass,
-			TTL:     uint32(op.TTL),
+			TTL:     op.TTL,
 			Records: op.Records,
 		}
 	}
@@ -195,7 +195,7 @@ func ForwardOpsToAtomic(operations []store.ScheduledOperation) []dnsx.Operation 
 			Name:    op.Name,
 			Type:    op.Type,
 			Class:   class,
-			TTL:     uint32(op.TTL),
+			TTL:     op.TTL,
 			Records: op.Records,
 		}
 	}

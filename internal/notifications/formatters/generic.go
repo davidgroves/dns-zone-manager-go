@@ -28,7 +28,7 @@ type Operation struct {
 	Name    string
 	RDType  string
 	RDClass string
-	TTL     *int
+	TTL     *uint32
 	Records []string
 }
 

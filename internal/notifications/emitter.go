@@ -129,7 +129,7 @@ func (e *EventEmitter) emit(ctx context.Context, zone string, msg *dns.Msg, even
 				}
 				opsStore := make([]store.AtomicOperation, 0, len(ops))
 				for _, op := range ops {
-					ttl := 3600
+					ttl := uint32(3600)
 					if op.TTL != nil {
 						ttl = *op.TTL
 					}

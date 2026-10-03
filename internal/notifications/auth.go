@@ -39,11 +39,8 @@ func TimestampHeader(auth config.WebhookAuth) string {
 
 // SigningInput builds the HMAC signing input: timestamp + "." + body.
 func SigningInput(timestamp string, body []byte) []byte {
-	out := make([]byte, 0, len(timestamp)+1+len(body))
-	out = append(out, timestamp...)
-	out = append(out, '.')
-	out = append(out, body...)
-	return out
+	out := append([]byte(timestamp), '.')
+	return append(out, body...)
 }
 
 // ComputeSignature returns algorithm=hexdigest HMAC over SigningInput.

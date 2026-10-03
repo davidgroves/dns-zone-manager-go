@@ -312,6 +312,82 @@ func TestProblemJSONNotFound(t *testing.T) {
 	}
 }
 
+func TestSessionCookieAuth(t *testing.T) {
+	settings := testSettings()
+	var secret config.Secret
+	secret.Set("k1")
+	settings.APIKey = config.APIKeySettings{
+		Enabled:    true,
+		HeaderName: "X-API-Key",
+		Keys:       map[string]config.Secret{"ops": secret},
+	}
+	backend := newFakeBackend()
+	backend.seed("example.com.", 1)
+	cache := dnsx.NewCacheWithBackend(settings, backend)
+	if _, err := cache.LoadZone(context.Background(), "example.com."); err != nil {
+		t.Fatalf("load zone: %v", err)
+	}
+	h := httpapi.New(httpapi.Deps{
+		Settings:   settings,
+		Auth:       auth.NewCombined(settings),
+		Cache:      cache,
+		DNSReady:   func(context.Context) bool { return true },
+		StoreReady: func(context.Context) bool { return true },
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/session", strings.NewReader(`{"remember":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", "k1")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("session status %d body=%s", rr.Code, rr.Body.String())
+	}
+	var cookie *http.Cookie
+	for _, c := range rr.Result().Cookies() {
+		if c.Name == auth.SessionCookieName {
+			cookie = c
+			break
+		}
+	}
+	if cookie == nil || cookie.Value == "" {
+		t.Fatal("missing session cookie")
+	}
+	if !cookie.HttpOnly {
+		t.Fatal("cookie must be HttpOnly")
+	}
+
+	val := httptest.NewRequest(http.MethodGet, "/v1/auth/validate", nil)
+	val.AddCookie(cookie)
+	rr2 := httptest.NewRecorder()
+	h.ServeHTTP(rr2, val)
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("validate status %d body=%s", rr2.Code, rr2.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rr2.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["user_id"] != "ops" {
+		t.Fatalf("body=%v", body)
+	}
+
+	out := httptest.NewRequest(http.MethodPost, "/v1/auth/logout", nil)
+	out.AddCookie(cookie)
+	rr3 := httptest.NewRecorder()
+	h.ServeHTTP(rr3, out)
+	if rr3.Code != http.StatusOK {
+		t.Fatalf("logout %d", rr3.Code)
+	}
+	val2 := httptest.NewRequest(http.MethodGet, "/v1/auth/validate", nil)
+	val2.AddCookie(cookie)
+	rr4 := httptest.NewRecorder()
+	h.ServeHTTP(rr4, val2)
+	if rr4.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 after logout, got %d %s", rr4.Code, rr4.Body.String())
+	}
+}
+
 func TestCursorEncodeDecodeVariants(t *testing.T) {
 	rr, err := httpapi.EncodeCursor(httpapi.RRsetCursorPayload{N: "www.example.com.", T: "A"})
 	if err != nil {

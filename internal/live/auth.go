@@ -7,17 +7,13 @@ import (
 	"github.com/davidgroves/dns-zone-manager-go/internal/config"
 )
 
-// AuthenticateWS authenticates a WebSocket upgrade using headers and query params.
-//
-// Browser WebSocket cannot set custom headers, so API keys may be supplied as
-// the api_key query parameter. Proxy identity headers and X-API-Key on the
-// upgrade request still work when present.
-func AuthenticateWS(r *http.Request, settings *config.Settings) (auth.User, error) {
+// WithAPIKeyQuery copies api_key from the query string into the API-key header
+// when the header is empty. Non-browser clients can still authenticate that way;
+// the SPA uses the HttpOnly session cookie instead.
+func WithAPIKeyQuery(r *http.Request, settings *config.Settings) *http.Request {
 	if settings == nil {
 		settings = &config.Settings{}
 	}
-	// Copy request so we can inject api_key query into the API key header
-	// without mutating the caller's header map unexpectedly when already set.
 	headerName := settings.APIKey.HeaderName
 	if headerName == "" {
 		headerName = "X-API-Key"
@@ -28,8 +24,16 @@ func AuthenticateWS(r *http.Request, settings *config.Settings) (auth.User, erro
 			r.Header.Set(headerName, key)
 		}
 	}
-	combined := auth.NewCombined(settings)
-	return combined.Authenticate(r)
+	return r
+}
+
+// AuthenticateWS authenticates a WebSocket upgrade using headers, cookies, and query params.
+func AuthenticateWS(r *http.Request, settings *config.Settings) (auth.User, error) {
+	if settings == nil {
+		settings = &config.Settings{}
+	}
+	r = WithAPIKeyQuery(r, settings)
+	return auth.NewCombined(settings).Authenticate(r)
 }
 
 // AuthenticateWSRequest is like AuthenticateWS but also attaches change context.
@@ -37,16 +41,6 @@ func AuthenticateWSRequest(r *http.Request, settings *config.Settings) (auth.Use
 	if settings == nil {
 		settings = &config.Settings{}
 	}
-	headerName := settings.APIKey.HeaderName
-	if headerName == "" {
-		headerName = "X-API-Key"
-	}
-	if r.Header.Get(headerName) == "" {
-		if key := r.URL.Query().Get("api_key"); key != "" {
-			r = r.Clone(r.Context())
-			r.Header.Set(headerName, key)
-		}
-	}
-	combined := auth.NewCombined(settings)
-	return combined.AuthenticateRequest(r)
+	r = WithAPIKeyQuery(r, settings)
+	return auth.NewCombined(settings).AuthenticateRequest(r)
 }

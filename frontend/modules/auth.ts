@@ -2,7 +2,7 @@ import { API_BASE, api } from '../api/client';
 import type { AppState, RouteParams } from '../types';
 import { syncUrlFromState } from './router';
 
-const API_KEY_STORAGE_KEY = 'dns_zone_manager_api_key';
+const LEGACY_API_KEY_STORAGE_KEY = 'dns_zone_manager_api_key';
 
 // Method context type - the full app state with methods (uses any to avoid circular refs)
 type MethodContext = AppState & {
@@ -15,25 +15,17 @@ type MethodContext = AppState & {
   disconnectZoneLive: () => void;
 };
 
-function clearStoredApiKey(): void {
-  sessionStorage.removeItem(API_KEY_STORAGE_KEY);
-  localStorage.removeItem(API_KEY_STORAGE_KEY);
-}
-
-function storeApiKey(apiKey: string, remember: boolean): void {
-  clearStoredApiKey();
-  const storage = remember ? localStorage : sessionStorage;
-  storage.setItem(API_KEY_STORAGE_KEY, apiKey);
-}
-
 /**
- * Read a previously stored API key (sessionStorage preferred, then localStorage).
+ * Drop any API key previously written to Web Storage (CodeQL js/clear-text-storage-of-sensitive-data).
+ * Stay-logged-in uses an HttpOnly session cookie issued by POST /v1/auth/session.
  */
-export function readStoredApiKey(): string | null {
-  return (
-    sessionStorage.getItem(API_KEY_STORAGE_KEY) ||
-    localStorage.getItem(API_KEY_STORAGE_KEY)
-  );
+export function purgeLegacyApiKeyStorage(): void {
+  try {
+    sessionStorage.removeItem(LEGACY_API_KEY_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_API_KEY_STORAGE_KEY);
+  } catch {
+    // Ignore storage access errors (private mode / blocked).
+  }
 }
 
 /**
@@ -63,8 +55,17 @@ export function createAuthMethods(_state: AppState) {
         const response = await api(`${API_BASE}/auth/validate`, this.apiKey);
 
         if (response.ok) {
+          purgeLegacyApiKeyStorage();
           if (this.apiKey) {
-            storeApiKey(this.apiKey, this.rememberApiKey);
+            const sessionRes = await api(`${API_BASE}/auth/session`, this.apiKey, {
+              method: 'POST',
+              body: JSON.stringify({ remember: this.rememberApiKey }),
+            });
+            if (sessionRes.ok) {
+              // Cookie carries the session; do not keep the API key in JS.
+              this.apiKey = null;
+              this.apiKeyInput = '';
+            }
           }
           this.authenticated = true;
           this.loginError = '';
@@ -80,21 +81,45 @@ export function createAuthMethods(_state: AppState) {
         } else if (response.status === 401) {
           this.loginError = 'Invalid API key';
           this.apiKey = null;
-          clearStoredApiKey();
+          purgeLegacyApiKeyStorage();
         } else if (response.status === 403) {
           this.loginError = 'Access denied';
           this.apiKey = null;
-          clearStoredApiKey();
+          purgeLegacyApiKeyStorage();
         } else {
           const errorText = await response.text();
           this.loginError = `Authentication failed: ${errorText || response.statusText}`;
           this.apiKey = null;
-          clearStoredApiKey();
+          purgeLegacyApiKeyStorage();
         }
       } catch (e) {
         this.loginError = `Connection error: ${(e as Error).message}`;
         this.apiKey = null;
-        clearStoredApiKey();
+        purgeLegacyApiKeyStorage();
+      }
+    },
+
+    /**
+     * Restore a browser session from the HttpOnly cookie (no API key in JS).
+     */
+    async restoreSession(this: MethodContext): Promise<boolean> {
+      purgeLegacyApiKeyStorage();
+      try {
+        const response = await api(`${API_BASE}/auth/validate`, null);
+        if (!response.ok) {
+          return false;
+        }
+        this.authenticated = true;
+        this.loginError = '';
+        if (this.intendedRoute) {
+          await this.navigateToRoute(this.intendedRoute);
+        } else {
+          await this.loadZones();
+          this.updateUrlFromState();
+        }
+        return true;
+      } catch {
+        return false;
       }
     },
 
@@ -132,7 +157,7 @@ export function createAuthMethods(_state: AppState) {
       this.authenticated = false;
       this.apiKey = null;
       this.apiKeyInput = '';
-      clearStoredApiKey();
+      purgeLegacyApiKeyStorage();
       this.zones = [];
       this.selectedZone = null;
       this.records = [];

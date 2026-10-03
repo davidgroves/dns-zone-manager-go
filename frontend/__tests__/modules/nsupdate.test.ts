@@ -101,6 +101,7 @@ describe('saveNsupdateAsDrafts', () => {
       expect.stringContaining('/nsupdate/drafts'),
       expect.objectContaining({
         method: 'POST',
+        credentials: 'include',
         headers: expect.objectContaining({
           'Content-Type': 'text/plain',
           'X-API-Key': 'test-key',

@@ -28,12 +28,16 @@ export function createNsupdateMethods(_state: AppState) {
       this.nsupdateResult = null;
 
       try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'text/plain',
+        };
+        if (this.apiKey) {
+          headers['X-API-Key'] = this.apiKey;
+        }
         const response = await fetch(`${API_BASE}/nsupdate/drafts`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'text/plain',
-            'X-API-Key': this.apiKey || '',
-          },
+          credentials: 'include',
+          headers,
           body: this.nsupdateText,
         });
 

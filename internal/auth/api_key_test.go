@@ -88,6 +88,28 @@ func TestCombinedUnauthorized(t *testing.T) {
 	}
 }
 
+func TestCombinedSessionCookie(t *testing.T) {
+	store := auth.NewSessionStore()
+	c := &auth.Combined{
+		APIKey:   config.APIKeySettings{Enabled: true, Keys: map[string]config.Secret{}},
+		Sessions: store,
+	}
+	u := auth.User{ID: "ops", AuthType: "api_key"}
+	token, _, err := store.Issue(u, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: token})
+	got, err := c.Authenticate(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != "ops" || got.AuthType != "api_key" {
+		t.Fatalf("got %+v", got)
+	}
+}
+
 func TestProxyAuth(t *testing.T) {
 	p := &auth.Proxy{Settings: config.ProxyAuthSettings{
 		Enabled:    true,

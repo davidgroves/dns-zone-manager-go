@@ -25,7 +25,7 @@ type ChangeOperation struct {
 	Name    string   `json:"name"`
 	RDType  string   `json:"type"`
 	RDClass string   `json:"rdclass"`
-	TTL     *int     `json:"ttl"`
+	TTL     *uint32  `json:"ttl"`
 	Records []string `json:"records"`
 }
 
@@ -258,7 +258,7 @@ func OperationsFromUpdate(msg *dns.Msg) []ChangeOperation {
 		}
 
 		var records []string
-		var ttl *int
+		var ttl *uint32
 		var action string
 		// Wire Class ANY/NONE encodes delete intent; presentation class stays IN.
 		presentClass := "IN"
@@ -282,7 +282,7 @@ func OperationsFromUpdate(msg *dns.Msg) []ChangeOperation {
 			records = []string{}
 		default:
 			action = "add"
-			t := int(h.Ttl)
+			t := h.Ttl
 			ttl = &t
 			if txt := rdataWithoutHeader(rr); txt != "" {
 				records = []string{txt}

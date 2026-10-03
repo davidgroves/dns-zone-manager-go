@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createAuthMethods, readStoredApiKey } from '../../modules/auth';
+import { createAuthMethods, purgeLegacyApiKeyStorage } from '../../modules/auth';
 import type { AppState } from '../../types';
 
 describe('auth storage', () => {
@@ -42,13 +42,15 @@ describe('auth storage', () => {
     vi.restoreAllMocks();
   });
 
-  it('readStoredApiKey prefers sessionStorage', () => {
+  it('purgeLegacyApiKeyStorage removes leftover keys', () => {
     sessionStorage.setItem('dns_zone_manager_api_key', 'session-key');
     localStorage.setItem('dns_zone_manager_api_key', 'local-key');
-    expect(readStoredApiKey()).toBe('session-key');
+    purgeLegacyApiKeyStorage();
+    expect(sessionStorage.getItem('dns_zone_manager_api_key')).toBeNull();
+    expect(localStorage.getItem('dns_zone_manager_api_key')).toBeNull();
   });
 
-  it('logout clears apiKeyInput and both storages', async () => {
+  it('logout clears apiKeyInput and leftover storage', async () => {
     const methods = createAuthMethods({} as AppState);
     const ctx = {
       apiKey: 'k',

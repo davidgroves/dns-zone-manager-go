@@ -77,7 +77,7 @@ func handleNSUpdateDrafts(w http.ResponseWriter, r *http.Request, d *Deps) {
 		for _, op := range dr.Operations {
 			ops = append(ops, store.AtomicOperation{
 				Action: op.Action, Name: op.Name, Type: op.Type,
-				RDClass: op.Class, TTL: int(op.TTL), Records: op.Records,
+				RDClass: op.Class, TTL: op.TTL, Records: op.Records,
 			})
 		}
 		prereqs := make([]store.ChangePrerequisite, 0, len(dr.Prerequisites))

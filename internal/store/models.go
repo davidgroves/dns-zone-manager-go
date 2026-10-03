@@ -122,9 +122,9 @@ type ScheduledOperationRow struct {
 	Name         string   `bun:"name,notnull"`
 	Type         string   `bun:"type,notnull"`
 	RDClass      string   `bun:"rdclass,notnull"`
-	TTL          int      `bun:"ttl,notnull"`
+	TTL          uint32   `bun:"ttl,notnull"`
 	Records      JSONText `bun:"records"`
-	PriorTTL     *int     `bun:"prior_ttl"`
+	PriorTTL     *uint32  `bun:"prior_ttl"`
 	PriorRecords JSONText `bun:"prior_records"`
 	SnapshotAt   *UtcTime `bun:"snapshot_at"`
 }
@@ -174,7 +174,7 @@ type AtomicOperation struct {
 	Name    string   `json:"name"`
 	Type    string   `json:"type"`
 	RDClass string   `json:"rdclass"`
-	TTL     int      `json:"ttl"`
+	TTL     uint32   `json:"ttl"`
 	Records []string `json:"records"`
 }
 
@@ -227,7 +227,7 @@ type ChangeUpdateData struct {
 // OpSnapshot is pre-apply RRset state for one operation.
 type OpSnapshot struct {
 	Seq          int
-	PriorTTL     *int
+	PriorTTL     *uint32
 	PriorRecords []string
 	SnapshotAt   time.Time
 }
@@ -247,9 +247,9 @@ type ScheduledOperation struct {
 	Name         string
 	Type         string
 	RDClass      string
-	TTL          int
+	TTL          uint32
 	Records      []string
-	PriorTTL     *int
+	PriorTTL     *uint32
 	PriorRecords []string
 	SnapshotAt   *time.Time
 }

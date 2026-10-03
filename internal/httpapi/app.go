@@ -27,7 +27,7 @@ func New(deps Deps) http.Handler {
 	api := humago.New(mux, cfg)
 
 	registerMeta(api, mux, &deps)
-	registerAuth(api, &deps)
+	registerAuth(api, mux, &deps)
 	registerZones(api, mux, &deps)
 	registerRRsets(api, &deps)
 	registerAtomic(api, &deps)

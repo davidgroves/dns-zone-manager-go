@@ -27,7 +27,7 @@ func TestCanRevertRequiresSnapshots(t *testing.T) {
 
 func TestBuildRevertOpsInverse(t *testing.T) {
 	now := time.Now().UTC()
-	priorTTL := 600
+	priorTTL := uint32(600)
 	change := &store.ScheduledChange{
 		Status: store.StatusApplied,
 		Operations: []store.ScheduledOperation{

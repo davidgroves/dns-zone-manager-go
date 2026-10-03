@@ -32,6 +32,7 @@ export function api(
 
   return fetch(path, {
     ...options,
+    credentials: 'include',
     headers,
   });
 }

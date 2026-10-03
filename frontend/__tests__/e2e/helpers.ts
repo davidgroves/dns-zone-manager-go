@@ -18,6 +18,7 @@ export async function backendRequiresLogin(page: Page): Promise<boolean> {
  * screen — wait for the app directly. Otherwise sign in with the demo API key.
  */
 export async function ensureLoggedIn(page: Page): Promise<void> {
+  await page.context().clearCookies();
   await page.goto('/');
   await page.evaluate(() => localStorage.clear());
   await page.goto('/');
