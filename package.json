@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:frontend": "vite",
-    "version:sync": "bash -c 'if V=$(git describe --tags --exact-match HEAD 2>/dev/null | sed s/^v//) && [ -n \"$V\" ]; then npm pkg set version=\"$V\"; else TAG=$(git describe --tags --abbrev=0 2>/dev/null | sed s/^v//); TAG=${TAG:-0.0.0}; N=$(git rev-list ${TAG:+$TAG..}HEAD --count 2>/dev/null || git rev-list HEAD --count); C=$(git rev-parse --short HEAD); D=$(date +%Y%m%d); npm pkg set version=\"${TAG}.dev${N}+g${C}.d${D}\"; fi'",
-    "build": "npm run version:sync && tsc && vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "biome check",

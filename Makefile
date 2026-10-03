@@ -1,7 +1,9 @@
 .PHONY: build test test-race test-integration lint fmt tidy run frontend-build docker-build types-generate
 
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.0.0+unknown)
+VERSION ?= $(shell ./scripts/app-version.sh)
 LDFLAGS := -X github.com/davidgroves/dns-zone-manager-go/internal/version.Version=$(VERSION)
+# Docker tags cannot contain '+'; keep the real VERSION for ldflags/build-arg.
+DOCKER_TAG := $(shell printf '%s' '$(VERSION)' | tr '+' '-')
 
 build:
 	mkdir -p bin
@@ -40,7 +42,7 @@ frontend-build:
 	cp -a dist/. internal/ui/dist/
 
 docker-build:
-	docker build -t dns-zone-manager:$(VERSION) .
+	docker build --build-arg VERSION=$(VERSION) -t dns-zone-manager:$(DOCKER_TAG) .
 
 types-generate:
 	npm run types:generate

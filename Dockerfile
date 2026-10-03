@@ -7,7 +7,6 @@
 FROM node:24-slim AS frontend
 
 WORKDIR /app
-ARG VERSION=0.0.0
 
 COPY package.json package-lock.json* ./
 RUN npm ci
@@ -15,7 +14,7 @@ RUN npm ci
 COPY tsconfig.json vite.config.ts biome.json ./
 COPY frontend/ ./frontend/
 
-RUN VER="${VERSION#v}" && npm pkg set version="$VER" && npx tsc && npx vite build
+RUN npx tsc && npx vite build
 
 # -----------------------------------------------------------------------------
 # Stage 2: Go build
@@ -23,7 +22,7 @@ RUN VER="${VERSION#v}" && npm pkg set version="$VER" && npx tsc && npx vite buil
 FROM golang:1.27-bookworm AS builder
 
 WORKDIR /src
-ARG VERSION=0.0.0
+ARG VERSION=v0.0.0+unknown
 
 COPY go.mod go.sum ./
 RUN go mod download
