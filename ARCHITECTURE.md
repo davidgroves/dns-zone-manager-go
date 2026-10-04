@@ -22,7 +22,7 @@ BIND round-trip attribution). Per-zone RWMutex + sorted owner/type index keep
 pagination and optimistic cache updates cheap.
 
 Success criterion: REST write rate within a few percent of direct DDNS against
-the same BIND; p99 HTTP duration minus DDNS round-trip under ~2 ms.
+the same BIND; p99 HTTP duration minus DDNS round-trip under ~20 ms.
 
 ## Key packages
 

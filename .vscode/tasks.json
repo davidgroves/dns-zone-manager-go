@@ -29,19 +29,6 @@
       "problemMatcher": []
     },
     {
-      "label": "BACKEND (Local)",
-      "type": "shell",
-      "command": "go run ./cmd/dns-zone-manager serve --config examples/config.yaml --ui-dir dist",
-      "dependsOn": ["Build SPA"],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
-      "isBackground": true,
-      "problemMatcher": []
-    },
-    {
       "label": "Vite (optional)",
       "type": "shell",
       "command": "npm run dev",
@@ -74,6 +61,21 @@
         "panel": "dedicated"
       },
       "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "LGTM",
+      "type": "shell",
+      "command": "proj=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" up -d lgtm && echo '\\nGrafana: http://localhost:3000  (Loki + metrics dashboards)\\n' && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" logs --tail 100 -f lgtm",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "isBackground": true,
+      "runOptions": {
+        "instanceLimit": 1
+      },
       "problemMatcher": []
     },
     {
@@ -125,7 +127,7 @@
       "problemMatcher": []
     },
     {
-      "label": "Run All",
+      "label": "Run All (Minimal)",
       "dependsOn": ["BACKEND", "BIND", "POSTGRES"],
       "dependsOrder": "parallel",
       "group": {
@@ -135,8 +137,8 @@
       "problemMatcher": []
     },
     {
-      "label": "Run All (Local)",
-      "dependsOn": ["BACKEND (Local)"],
+      "label": "Run All (Complete)",
+      "dependsOn": ["BACKEND", "BIND", "POSTGRES", "ZONE CHURN", "LGTM"],
       "dependsOrder": "parallel",
       "group": "build",
       "problemMatcher": []

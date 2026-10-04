@@ -1,5 +1,46 @@
 # Development (Go)
 
+Work on this tree **inside the Dev Container**. The workspace is
+`.devcontainer/`: a Compose project with the `dev` service (Go, Node, DNS
+tools, Docker socket), sibling **BIND** (`bind:15353`), **PostgreSQL**
+(tmpfs; schema is created when the API starts), and optional **LGTM**
+(Grafana / Loki / Prometheus / Tempo).
+
+In Cursor or VS Code: clone the repo, install the Dev Containers extension,
+then **Reopen in Container**. First create runs `npm install`, `go mod
+download`, and pre-commit. Auth is off in this config (anonymous admin).
+
+The API does **not** start with the container. Use **Tasks** after attach:
+
+- **Terminal → Run Task…** (or Command Palette → **Tasks: Run Task**)
+- **Run All (Minimal)** — default build task (`Ctrl+Shift+B` / **Run Build
+  Task**). Starts **BACKEND**, **BIND** log follow, and **POSTGRES** log
+  follow. BACKEND builds the SPA into `dist/` then
+  `go run … serve --config .devcontainer/config.devcontainer.yaml --ui-dir dist`.
+- **Run All (Complete)** — the same, plus **ZONE CHURN** (DDNS against
+  `always-changing.example`) and **LGTM** (`docker compose up` Grafana).
+
+Open **http://localhost:8000** for the API and the UI the binary is serving.
+With Complete, Grafana is **http://localhost:3000**. Stop tasks with
+**Terminal: Kill All Terminals**.
+
+BIND and Postgres are already Compose services; those tasks mainly attach to
+logs. BACKEND is the process you restart after Go changes.
+
+## Frontend live reload (Vite)
+
+BACKEND’s `--ui-dir dist` is a **static** Vite production build. Editing
+`frontend/` does not update http://localhost:8000 until you run **Build SPA**
+again (or restart BACKEND, which depends on that build).
+
+For HMR, start **Vite (optional)** (`npm run dev`). That serves the SPA at
+**http://localhost:5173** and proxies `/v1`, WebSocket `/v1/live`, `/health`,
+and `/ui/…` to the API on :8000. Keep BACKEND running. Use :5173 in the
+browser while changing Alpine/TS/CSS; use :8000 when you care about the
+embedded-SPA path the production binary uses.
+
+Playwright E2E defaults to :5173, so Vite must be up for those tests.
+
 ## Tooling
 
 - Go **1.27+** (`go version`)
@@ -14,81 +55,6 @@ pre-commit run --all-files  # gofmt, go vet, golangci-lint, tsc
 ```
 
 Config: `.pre-commit-config.yaml` (Go/npm system hooks) and `.golangci.yml` (v2).
-
-## Layout
-
-```
-cmd/dns-zone-manager/   # API server (cobra: serve)
-cmd/dns-cli/            # CLI helper
-internal/
-  httpapi/              # Huma/chi HTTP API, middleware, SPA
-  dnsx/                 # DDNS client, zone cache, NOTIFY
-  catalog/              # RFC 9432 catalog indexer
-  provision/            # optional rndc zone create/delete
-  store/                # scheduled changes + audit (SQLite/Postgres)
-  scheduler/            # apply loop
-  config/               # YAML + env loading
-  ui/dist/              # embedded SPA assets
-frontend/               # TypeScript Alpine.js SPA (source)
-tests/integration/      # //go:build integration
-```
-
-## Local loop
-
-```bash
-# Build the SPA, then serve API + UI from that directory on :8000
-npx tsc && npx vite build
-go run ./cmd/dns-zone-manager serve --config examples/config.yaml --ui-dir dist
-```
-
-Open http://localhost:8000. Browsers receive the SPA; clients that do not send
-`Accept: text/html` still get the API info document at `/`.
-
-`--ui-dir` reads the Vite build at runtime. Omit it to serve the assets
-embedded in the binary (`make frontend-build`, which is what the container
-image does). `npm run dev` (Vite on :5173) is optional for hot reload. The
-devcontainer **Run All** task does not start it.
-
-## Tests
-
-```bash
-go test ./...
-go test -race ./...
-go test -tags=integration ./tests/integration/...
-npm run test
-npm run typecheck
-./tests.sh
-./tests.sh --all
-./tests.sh --report test-report.pdf   # same run, plus a PDF summary
-```
-
-Go integration tests (`//go:build integration`) need Docker. They cover BIND-backed
-API checks and **dns-cli E2E** (`TestDNSCLI`): the CLI binary is built and run against
-an httptest API with BIND + SQLite. Run only the CLI suite with:
-
-```bash
-go test -tags=integration ./tests/integration/ -count=1 -run DNSCLI
-```
-
-## OpenAPI types
-
-With the server listening:
-
-```bash
-npm run types:generate   # → frontend/types/api.d.ts
-```
-
-## Docker
-
-```bash
-make docker-build
-docker run --rm -p 8000:8000 -v "$PWD/config.yaml:/config.yaml:ro" \
-  dns-zone-manager:local serve --config /config.yaml
-```
-
-Distroless runtime: probe `/health` from the orchestrator (no curl in-image).
-Compose uses `dns-zone-manager healthcheck`, which GETs that URL and exits 0
-on HTTP 200.
 
 ## Forked miekg/dns
 
