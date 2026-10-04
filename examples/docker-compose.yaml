@@ -24,8 +24,8 @@ services:
       # Mount zones as read-only source, copy to writable location at startup
       - ./bind/zones:/etc/bind/zones-source:ro
       - bind-zones:/var/lib/bind
-      # On-demand large zones for the performance harness (shared with perf-runner)
       - perf-zones:/perf-zones
+      - managed-zones:/managed-zones
     ports:
       - "15353:53/tcp"
       - "15353:53/udp"
@@ -44,8 +44,8 @@ services:
         set -e
         cp /etc/bind/zones-source/* /var/lib/bind/
         chmod 666 /var/lib/bind/*
-        mkdir -p /perf-zones
-        chmod 777 /perf-zones
+        mkdir -p /perf-zones /managed-zones
+        chmod 777 /perf-zones /managed-zones
 
         # Start with an empty also-notify so named can boot before the API.
         echo 'also-notify { };' > /var/lib/bind/also-notify.conf
@@ -129,6 +129,7 @@ services:
       # Mount config file (copy config.example.yaml to config.yaml and customize)
       - ./config.yaml:/app/config.yaml:ro
       - perf-zones:/perf-zones:ro
+      - managed-zones:/managed-zones
     environment:
       # Ship structured logs to Loki via the LGTM OTLP collector
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4318
@@ -254,3 +255,4 @@ volumes:
   postgres-data:
   lgtm-data:
   perf-zones:
+  managed-zones:

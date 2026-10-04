@@ -52,6 +52,25 @@ catalog:
   auto_load_zones: true
   remove_stale_zones: false
 
+# Optional BIND rndc control for creating and deleting zones.
+# BIND 9.20 (this stack) has no `initial-file`, so the API writes a seed zone
+# file into a directory shared with named, then runs `rndc addzone`.
+rndc:
+  enabled: true
+  host: bind
+  port: 953
+  algorithm: hmac-sha256
+  secret: xT7J2kLpN9qRvW4mY8sF1gH5bC3dE6aZ0iO7uP2wX4c=
+  zone_seed:
+    mode: shared_dir
+    local_dir: /managed-zones
+    bind_dir: /managed-zones
+  zone_defaults:
+    primary_ns: ns1.example.
+    admin_email: hostmaster.example.
+    nameservers:
+      - ns1.example.
+
 # NOTIFY Listener
 notify:
   enabled: true

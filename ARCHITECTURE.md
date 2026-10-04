@@ -36,6 +36,23 @@ the same BIND; p99 HTTP duration minus DDNS round-trip under ~2 ms.
 | `internal/live` | WebSocket hub |
 | `internal/httpapi` | Huma routes, middleware, opaque cursors, SPA |
 | `internal/catalog` | RFC 9432 catalog zone indexer |
+| `internal/provision` | Optional zone create/delete (BIND rndc today) |
+
+## Zone provisioning and BIND coupling
+
+Day-to-day zone *contents* stay server-agnostic: AXFR / IXFR / DDNS / NOTIFY /
+TSIG against whichever hidden primary is configured. Optional **zone
+create/delete** is the exception. `POST /v1/zones` and `DELETE /v1/zones/{zone}`
+go through `internal/provision`, which today talks **rndc** (`addzone` /
+`delzone`), writes a BIND seed zone file (`zone_seed.mode: shared_dir` on 9.20),
+and optionally adds/removes an RFC 9432 catalog PTR via DDNS.
+
+That is a BIND-primary coupling, not a core DNS one. Catalog membership, cache
+`LoadZone`, and the HTTP/CLI surface are already behind `httpapi.ZoneProvisioner`
+and do not need rndc. A Knot / NSD / PowerDNS primary should be a second
+provision backend (control-channel + seed strategy) with the same
+create/delete/status contract — keep BIND-specific config and `rndc-go` inside
+that implementation.
 
 ## API differences from the retired Python service
 

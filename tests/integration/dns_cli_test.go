@@ -191,3 +191,24 @@ func TestDNSCLI(t *testing.T) {
 		require.True(t, ok, "missing changes key: %v", body)
 	})
 }
+
+func TestDNSCLIZoneProvision(t *testing.T) {
+	stack := startBINDAPI(t, stackOptions{withStore: true, serveHTTP: true, withRNDC: true})
+	base := stack.BaseURL
+
+	stdout, stderr, err := runDNSCLI(t, base, "rndc", "status")
+	require.NoError(t, err, "stderr=%s stdout=%s", stderr, stdout)
+	require.Contains(t, stdout, "RNDC: enabled")
+
+	stdout, stderr, err = runDNSCLI(t, base, "zone", "create", "cli-managed.test.")
+	require.NoError(t, err, "stderr=%s stdout=%s", stderr, stdout)
+	require.Contains(t, stdout, "Created zone")
+
+	stdout, stderr, err = runDNSCLI(t, base, "list", "zones")
+	require.NoError(t, err, "stderr=%s stdout=%s", stderr, stdout)
+	require.Contains(t, stdout, "cli-managed.test.")
+
+	stdout, stderr, err = runDNSCLI(t, base, "zone", "delete", "cli-managed.test.")
+	require.NoError(t, err, "stderr=%s stdout=%s", stderr, stdout)
+	require.Contains(t, stdout, "Deleted zone")
+}

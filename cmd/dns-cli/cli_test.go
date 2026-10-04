@@ -239,3 +239,61 @@ func TestSearchZone(t *testing.T) {
 		t.Fatalf("path=%q", gotPath)
 	}
 }
+
+func TestZoneCreate(t *testing.T) {
+	var gotMethod, gotPath string
+	var body map[string]any
+	_, opts := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath = r.Method, r.URL.Path
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{"zone": "new.example.", "catalog_added": true})
+	})
+	stdout, _, err := runCLI(t, opts, "zone", "create", "new.example.", "--primary-ns", "ns1.example.", "--no-catalog")
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/v1/zones" {
+		t.Fatalf("request %s %s", gotMethod, gotPath)
+	}
+	if body["zone"] != "new.example." || body["catalog"] != false {
+		t.Fatalf("body=%v", body)
+	}
+	if !strings.Contains(stdout, "Created zone") {
+		t.Fatalf("stdout=%q", stdout)
+	}
+}
+
+func TestZoneDelete(t *testing.T) {
+	var gotMethod, gotPath, gotQuery string
+	_, opts := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath, gotQuery = r.Method, r.URL.Path, r.URL.RawQuery
+		_ = json.NewEncoder(w).Encode(map[string]any{"zone": "new.example.", "catalog_removed": true})
+	})
+	_, _, err := runCLI(t, opts, "zone", "delete", "new.example.", "--keep-files")
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if gotMethod != http.MethodDelete || gotPath != "/v1/zones/new.example." {
+		t.Fatalf("request %s %s", gotMethod, gotPath)
+	}
+	if !strings.Contains(gotQuery, "keep_files=true") {
+		t.Fatalf("query=%q", gotQuery)
+	}
+}
+
+func TestRNDCStatusCLI(t *testing.T) {
+	_, opts := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/rndc/status" {
+			t.Errorf("path=%s", r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"enabled": true, "host": "bind", "port": 953, "connected": true, "seed_mode": "shared_dir", "catalog_enabled": true})
+	})
+	stdout, _, err := runCLI(t, opts, "rndc", "status")
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !strings.Contains(stdout, "RNDC: enabled") {
+		t.Fatalf("stdout=%q", stdout)
+	}
+}

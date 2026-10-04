@@ -48,6 +48,39 @@ func TestZoneSetFromAXFR(t *testing.T) {
 	}
 }
 
+func TestZoneSetFromAXFRStripsTrailingSOA(t *testing.T) {
+	z := NewZone("example.com.")
+	rrs := sampleZoneRRs(t)
+	soa := mustRR(t, "example.com. 3600 IN SOA ns.example.com. host.example.com. 2024010101 7200 3600 1209600 300")
+	rrs = append(rrs, soa)
+	if err := z.SetFromAXFR(rrs); err != nil {
+		t.Fatal(err)
+	}
+	if z.RecordCount() != 5 {
+		t.Fatalf("records %d", z.RecordCount())
+	}
+	info, ok := z.GetRRset("@", dns.TypeSOA)
+	if !ok || len(info.Records) != 1 {
+		t.Fatalf("soa records: ok=%v n=%d", ok, len(info.Records))
+	}
+}
+
+func TestZoneInsertRRDedupesIdenticalRdata(t *testing.T) {
+	z := NewZone("example.com.")
+	a := mustRR(t, "www.example.com. 300 IN A 192.0.2.1")
+	if err := z.SetFromAXFR([]dns.RR{
+		mustRR(t, "example.com. 3600 IN SOA ns.example.com. host.example.com. 1 3600 600 86400 60"),
+		a,
+		mustRR(t, "www.example.com. 300 IN A 192.0.2.1"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	info, ok := z.GetRRset("www", dns.TypeA)
+	if !ok || len(info.Records) != 1 {
+		t.Fatalf("A records: ok=%v n=%d", ok, len(info.Records))
+	}
+}
+
 func TestZoneGetAndList(t *testing.T) {
 	z := NewZone("example.com.")
 	_ = z.SetFromAXFR(sampleZoneRRs(t))

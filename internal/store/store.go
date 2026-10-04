@@ -208,6 +208,10 @@ func (s *Store) Create(ctx context.Context, data ChangeCreateData) (*ScheduledCh
 			notValidAfter = &nv
 		}
 		auto := data.AutoPrerequisites
+		kind := data.Kind
+		if kind == "" {
+			kind = KindRecords
+		}
 		row := &ScheduledChangeRow{
 			ID:                changeID,
 			Name:              data.Name,
@@ -220,6 +224,8 @@ func (s *Store) Create(ctx context.Context, data ChangeCreateData) (*ScheduledCh
 			UpdatedAt:         NewUtcTime(now),
 			Attempts:          0,
 			Source:            "scheduler",
+			Kind:              kind,
+			Payload:           JSONText(data.Payload),
 		}
 		if data.ScheduledAt != nil {
 			t := NewUtcTime(*data.ScheduledAt)
@@ -313,6 +319,10 @@ func (s *Store) RecordExternalChange(ctx context.Context, opts RecordExternalOpt
 			}
 			ops = append(ops, a)
 		}
+		kind := opts.Kind
+		if kind == "" {
+			kind = KindRecords
+		}
 		row := &ScheduledChangeRow{
 			ID:                changeID,
 			Name:              name,
@@ -326,6 +336,8 @@ func (s *Store) RecordExternalChange(ctx context.Context, opts RecordExternalOpt
 			ResultRcode:       opts.ResultRcode,
 			LastError:         opts.Error,
 			Source:            source,
+			Kind:              kind,
+			Payload:           JSONText(opts.Payload),
 		}
 		if status == StatusApplied {
 			t := NewUtcTime(now)
@@ -377,6 +389,8 @@ type RecordExternalOpts struct {
 	Error       *string
 	OccurredAt  *time.Time
 	Source      string
+	Kind        string
+	Payload     json.RawMessage
 }
 
 func (s *Store) insertOperations(ctx context.Context, tx bun.IDB, changeID string, operations []AtomicOperation) error {
@@ -1614,9 +1628,13 @@ func (s *Store) rowToChange(ctx context.Context, tx bun.IDB, row *ScheduledChang
 	if source == "" {
 		source = "scheduler"
 	}
+	kind := row.Kind
+	if kind == "" {
+		kind = KindRecords
+	}
 	ch := &ScheduledChange{
 		ID: row.ID, Name: row.Name, Description: row.Description, Zone: row.Zone,
-		Status: row.Status, Source: source,
+		Status: row.Status, Source: source, Kind: kind, Payload: json.RawMessage(row.Payload),
 		AutoPrerequisites: row.AutoPrerequisites,
 		CreatedAt:         row.CreatedAt.Std(), CreatedBy: row.CreatedBy,
 		UpdatedAt: row.UpdatedAt.Std(), Attempts: row.Attempts,

@@ -19,6 +19,10 @@ const (
 	StatusCancelled = "cancelled"
 	StatusExpired   = "expired"
 	StatusReverted  = "reverted"
+
+	KindRecords    = "records"
+	KindZoneCreate = "zone_create"
+	KindZoneDelete = "zone_delete"
 )
 
 var (
@@ -43,7 +47,9 @@ func (j JSONText) Value() (driver.Value, error) {
 	if j == nil {
 		return nil, nil
 	}
-	return []byte(j), nil
+	// string, not []byte: Postgres otherwise binds JSON/JSONB as bytea
+	// ('\x7b...') which is invalid JSON input.
+	return string(j), nil
 }
 
 func (j *JSONText) Scan(src any) error {
@@ -110,6 +116,8 @@ type ScheduledChangeRow struct {
 	LeaseOwner        *string  `bun:"lease_owner"`
 	LeaseExpiresAt    *UtcTime `bun:"lease_expires_at"`
 	Source            string   `bun:"source,notnull"`
+	Kind              string   `bun:"kind,notnull"`
+	Payload           JSONText `bun:"payload"`
 }
 
 // ScheduledOperationRow is the bun model for scheduled_operations.
@@ -206,6 +214,8 @@ type ChangeCreateData struct {
 	NotValidAfter     *time.Time
 	AutoPrerequisites bool
 	CreatedBy         *string
+	Kind              string
+	Payload           json.RawMessage
 }
 
 // ChangeUpdateData is the internal update payload.
@@ -298,6 +308,8 @@ type ScheduledChange struct {
 	ResultRcode       *string
 	NewSerial         *int64
 	RevertedAt        *time.Time
+	Kind              string
+	Payload           json.RawMessage
 	Operations        []ScheduledOperation
 	Prerequisites     []ChangePrerequisite
 	Events            []ScheduledChangeEvent

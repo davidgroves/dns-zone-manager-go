@@ -18,6 +18,7 @@ type ZoneMethodContext = AppState & {
   clearSearch: () => void;
   loadZones: (cursor?: string | null, resetHistory?: boolean) => Promise<void>;
   loadCatalogStatus: () => Promise<void>;
+  loadRNDCStatus?: () => Promise<void>;
   selectZone: (zone: string) => Promise<void>;
   loadZonesFirstPage: () => Promise<void>;
   loadZonesWithOffset: (offset: number) => Promise<void>;
@@ -81,6 +82,7 @@ export function createZoneMethods(_state: AppState) {
         }
 
         await this.loadCatalogStatus();
+        await this.loadRNDCStatus?.();
       } catch (e) {
         this.toast(`Failed to load zones: ${(e as Error).message}`, 'error');
       }

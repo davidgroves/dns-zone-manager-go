@@ -85,6 +85,9 @@ func CanRevert(change *store.ScheduledChange) bool {
 	if change == nil || change.Status != store.StatusApplied {
 		return false
 	}
+	if change.Kind != "" && change.Kind != store.KindRecords {
+		return false
+	}
 	if len(change.Operations) == 0 {
 		return false
 	}

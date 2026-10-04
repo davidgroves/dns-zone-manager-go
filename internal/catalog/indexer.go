@@ -175,6 +175,13 @@ func (i *Indexer) ZoneName() string {
 	return i.cfg.ZoneName
 }
 
+// PeekZone returns the last AXFR'd catalog zone, or nil if not loaded.
+func (i *Indexer) PeekZone() *dnsx.Zone {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	return i.zone
+}
+
 // Serial returns the last known SOA serial.
 func (i *Indexer) Serial() (uint32, bool) {
 	i.mu.RLock()

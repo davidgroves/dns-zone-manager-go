@@ -35,6 +35,7 @@ func RunLoop(
 	cache *dnsx.ZoneCache,
 	schedSettings config.SchedulerSettings,
 	retentionSettings config.RetentionSettings,
+	prov ZoneProvisioner,
 ) {
 	owner := leaseOwnerID()
 	pollInterval := schedSettings.PollInterval
@@ -106,6 +107,7 @@ func RunLoop(
 					RetryBackoff: schedSettings.RetryBackoff,
 					Actor:        &owner,
 					Trigger:      notifications.TriggerScheduler,
+					Provisioner:  prov,
 				})
 
 				if result.Success {

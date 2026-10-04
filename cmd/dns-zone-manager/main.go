@@ -22,6 +22,7 @@ import (
 	"github.com/davidgroves/dns-zone-manager-go/internal/logging"
 	"github.com/davidgroves/dns-zone-manager-go/internal/metrics"
 	"github.com/davidgroves/dns-zone-manager-go/internal/notifications"
+	"github.com/davidgroves/dns-zone-manager-go/internal/provision"
 	"github.com/davidgroves/dns-zone-manager-go/internal/scheduler"
 	"github.com/davidgroves/dns-zone-manager-go/internal/store"
 	"github.com/davidgroves/dns-zone-manager-go/internal/version"
@@ -115,8 +116,6 @@ func runServe(configPath, host string, port int, uiDir string) error {
 			return fmt.Errorf("open store: %w", err)
 		}
 		defer func() { _ = st.Close() }()
-
-		go scheduler.RunLoop(ctx, st, client, cache, settings.Scheduler, settings.Retention)
 	}
 
 	if settings.Webhooks.Enabled {
@@ -191,17 +190,31 @@ func runServe(configPath, host string, port int, uiDir string) error {
 		catalogDep = catIndexer
 	}
 
+	var catSrc provision.CatalogSource
+	if catIndexer != nil {
+		catSrc = catIndexer
+	}
+	var provDep httpapi.ZoneProvisioner
+	if settings.RNDC.Enabled {
+		provDep = provision.New(settings, client, cache, catSrc, st)
+	}
+
+	if settings.Scheduler.Enabled && st != nil {
+		go scheduler.RunLoop(ctx, st, client, cache, settings.Scheduler, settings.Retention, provDep)
+	}
+
 	deps := httpapi.Deps{
-		Settings: settings,
-		UIDir:    uiDir,
-		Auth:     auth.NewCombined(settings),
-		Client:   client,
-		Cache:    cache,
-		Store:    st,
-		Hub:      hub,
-		Catalog:  catalogDep,
-		Emitter:  emitter,
-		Notify:   notifyStatus(notifyListener, settings),
+		Settings:    settings,
+		UIDir:       uiDir,
+		Auth:        auth.NewCombined(settings),
+		Client:      client,
+		Cache:       cache,
+		Store:       st,
+		Hub:         hub,
+		Catalog:     catalogDep,
+		Emitter:     emitter,
+		Notify:      notifyStatus(notifyListener, settings),
+		Provisioner: provDep,
 	}
 	handler := httpapi.New(deps)
 

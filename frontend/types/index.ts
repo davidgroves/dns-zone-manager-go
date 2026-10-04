@@ -125,6 +125,8 @@ export interface ScheduledChange {
   result_rcode: string | null;
   new_serial: number | null;
   reverted_at?: string | null;
+  kind?: string;
+  payload?: Record<string, unknown> | null;
   operations: Array<{
     action: 'add' | 'delete' | 'replace';
     name: string;
@@ -256,6 +258,31 @@ export interface CatalogStatus {
   enabled: boolean;
   zone?: string;
   last_sync?: string;
+}
+
+export interface RNDCStatus {
+  enabled: boolean;
+  connected?: boolean;
+  host?: string;
+  port?: number;
+  seed_mode?: string;
+  catalog_enabled?: boolean;
+  defaults?: {
+    primary_ns?: string;
+    admin_email?: string;
+    nameservers?: string[];
+    ttl?: number;
+  };
+}
+
+export interface CreateZoneForm {
+  zone: string;
+  primaryNs: string;
+  adminEmail: string;
+  nameservers: string;
+  addToCatalog: boolean;
+  schedule: boolean;
+  scheduledLocal: string;
 }
 
 export interface RecordForm {
@@ -390,6 +417,12 @@ export interface AppState {
   catalogStatus: CatalogStatus | null;
   catalogZones: Set<string>;
   syncingCatalog: boolean;
+  rndcStatus: RNDCStatus | null;
+  showCreateZone: boolean;
+  showDeleteZoneConfirm: boolean;
+  creatingZone: boolean;
+  deletingZone: boolean;
+  createZoneForm: CreateZoneForm;
 
   // Record Pagination
   pageSizeMode: PageSizeMode;

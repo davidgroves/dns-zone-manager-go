@@ -298,6 +298,8 @@ export function canRevertChange(change: {
   }>;
 }): boolean {
   if (change.status !== 'applied') return false;
+  const kind = (change as { kind?: string }).kind;
+  if (kind && kind !== 'records') return false;
   if (!change.operations || change.operations.length === 0) return false;
   return change.operations.every(
     (op) => op.snapshot_at != null && op.snapshot_at !== '',

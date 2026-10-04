@@ -29,6 +29,7 @@ func New(deps Deps) http.Handler {
 	registerMeta(api, mux, &deps)
 	registerAuth(api, mux, &deps)
 	registerZones(api, mux, &deps)
+	registerProvision(api, &deps)
 	registerRRsets(api, &deps)
 	registerAtomic(api, &deps)
 	registerSearch(api, &deps)

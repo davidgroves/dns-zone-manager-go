@@ -103,6 +103,7 @@ func applyDefaults(s *Settings) {
 	if s.Catalog.NotifyTCPPort == 0 {
 		s.Catalog.NotifyTCPPort = 5354
 	}
+	applyRNDCDefaults(&s.RNDC, s.DNS.UpdateTSIGKey)
 	if s.Notify.BindAddress == "" {
 		s.Notify.BindAddress = "0.0.0.0"
 	}
@@ -203,6 +204,48 @@ func applyDefaults(s *Settings) {
 	}
 	if s.Logging.SlowThresholdMS == 0 {
 		s.Logging.SlowThresholdMS = 1000
+	}
+}
+
+func applyRNDCDefaults(r *RNDCSettings, updateKey string) {
+	if r.Port == 0 {
+		r.Port = 953
+	}
+	if r.Algorithm == "" {
+		r.Algorithm = "hmac-sha256"
+	}
+	if r.Timeout == 0 {
+		r.Timeout = 10 * time.Second
+	}
+	if r.ZoneSeed.Mode == "" {
+		r.ZoneSeed.Mode = RNDCSeedSharedDir
+	}
+	if r.ZoneTemplate.AllowUpdateKey == "" {
+		r.ZoneTemplate.AllowUpdateKey = updateKey
+	}
+	if r.ZoneTemplate.AllowTransferKey == "" {
+		r.ZoneTemplate.AllowTransferKey = r.ZoneTemplate.AllowUpdateKey
+	}
+	if r.ZoneDefaults.TTL == 0 {
+		r.ZoneDefaults.TTL = 3600
+	}
+	if r.ZoneDefaults.Refresh == 0 {
+		r.ZoneDefaults.Refresh = 3600
+	}
+	if r.ZoneDefaults.Retry == 0 {
+		r.ZoneDefaults.Retry = 600
+	}
+	if r.ZoneDefaults.Expire == 0 {
+		r.ZoneDefaults.Expire = 86400
+	}
+	if r.ZoneDefaults.Minimum == 0 {
+		r.ZoneDefaults.Minimum = 60
+	}
+	if r.CatalogMemberTTL == 0 {
+		r.CatalogMemberTTL = 3600
+	}
+	if r.ReadyTimeout == 0 {
+		r.ReadyTimeout = 30 * time.Second
 	}
 }
 

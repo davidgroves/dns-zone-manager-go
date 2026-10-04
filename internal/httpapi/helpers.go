@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -188,6 +189,16 @@ func scheduledChangeResponse(c *store.ScheduledChange) map[string]any {
 		"operations":         ops,
 		"prerequisites":      prereqs,
 		"events":             events,
+		"kind":               c.Kind,
+	}
+	if out["kind"] == "" {
+		out["kind"] = store.KindRecords
+	}
+	if len(c.Payload) > 0 {
+		var payload any
+		if err := json.Unmarshal(c.Payload, &payload); err == nil {
+			out["payload"] = payload
+		}
 	}
 	if c.Description != nil {
 		out["description"] = *c.Description

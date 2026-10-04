@@ -15,6 +15,7 @@ type Settings struct {
 	ProxyAuth ProxyAuthSettings `mapstructure:"proxy_auth" yaml:"proxy_auth"`
 	Cache     CacheSettings     `mapstructure:"cache" yaml:"cache"`
 	Catalog   CatalogSettings   `mapstructure:"catalog" yaml:"catalog"`
+	RNDC      RNDCSettings      `mapstructure:"rndc" yaml:"rndc"`
 	Notify    NotifySettings    `mapstructure:"notify" yaml:"notify"`
 	Scheduler SchedulerSettings `mapstructure:"scheduler" yaml:"scheduler"`
 	Database  DatabaseSettings  `mapstructure:"database" yaml:"database"`
@@ -104,6 +105,52 @@ type CatalogSettings struct {
 	NotifyTCPPort     int     `mapstructure:"notify_tcp_port" yaml:"notify_tcp_port"`
 	AutoLoadZones     bool    `mapstructure:"auto_load_zones" yaml:"auto_load_zones"`
 	RemoveStaleZones  bool    `mapstructure:"remove_stale_zones" yaml:"remove_stale_zones"`
+}
+
+const (
+	RNDCSeedSharedDir   = "shared_dir"
+	RNDCSeedInitialFile = "initial_file"
+)
+
+// RNDCSettings configures optional BIND rndc-backed zone create/delete.
+type RNDCSettings struct {
+	Enabled          bool             `mapstructure:"enabled" yaml:"enabled"`
+	Host             string           `mapstructure:"host" yaml:"host"`
+	Port             int              `mapstructure:"port" yaml:"port"`
+	Algorithm        string           `mapstructure:"algorithm" yaml:"algorithm"`
+	Secret           Secret           `mapstructure:"secret" yaml:"secret"`
+	SecretFile       string           `mapstructure:"secret_file" yaml:"secret_file"`
+	Timeout          time.Duration    `mapstructure:"timeout" yaml:"timeout"`
+	View             string           `mapstructure:"view" yaml:"view"`
+	ZoneSeed         RNDCZoneSeed     `mapstructure:"zone_seed" yaml:"zone_seed"`
+	ZoneTemplate     RNDCZoneTemplate `mapstructure:"zone_template" yaml:"zone_template"`
+	ZoneDefaults     RNDCZoneDefaults `mapstructure:"zone_defaults" yaml:"zone_defaults"`
+	CatalogMemberTTL uint32           `mapstructure:"catalog_member_ttl" yaml:"catalog_member_ttl"`
+	ReadyTimeout     time.Duration    `mapstructure:"ready_timeout" yaml:"ready_timeout"`
+}
+
+type RNDCZoneSeed struct {
+	Mode        string `mapstructure:"mode" yaml:"mode"`
+	LocalDir    string `mapstructure:"local_dir" yaml:"local_dir"`
+	BindDir     string `mapstructure:"bind_dir" yaml:"bind_dir"`
+	InitialFile string `mapstructure:"initial_file" yaml:"initial_file"`
+}
+
+type RNDCZoneTemplate struct {
+	AllowUpdateKey   string `mapstructure:"allow_update_key" yaml:"allow_update_key"`
+	AllowTransferKey string `mapstructure:"allow_transfer_key" yaml:"allow_transfer_key"`
+	Extra            string `mapstructure:"extra" yaml:"extra"`
+}
+
+type RNDCZoneDefaults struct {
+	PrimaryNS   string   `mapstructure:"primary_ns" yaml:"primary_ns"`
+	AdminEmail  string   `mapstructure:"admin_email" yaml:"admin_email"`
+	Nameservers []string `mapstructure:"nameservers" yaml:"nameservers"`
+	TTL         uint32   `mapstructure:"ttl" yaml:"ttl"`
+	Refresh     uint32   `mapstructure:"refresh" yaml:"refresh"`
+	Retry       uint32   `mapstructure:"retry" yaml:"retry"`
+	Expire      uint32   `mapstructure:"expire" yaml:"expire"`
+	Minimum     uint32   `mapstructure:"minimum" yaml:"minimum"`
 }
 
 type NotifySettings struct {

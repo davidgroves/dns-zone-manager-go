@@ -39,6 +39,20 @@ export function createInitialState(config: AppConfig): AppState {
     catalogStatus: null,
     catalogZones: new Set(),
     syncingCatalog: false,
+    rndcStatus: null,
+    showCreateZone: false,
+    showDeleteZoneConfirm: false,
+    creatingZone: false,
+    deletingZone: false,
+    createZoneForm: {
+      zone: '',
+      primaryNs: '',
+      adminEmail: '',
+      nameservers: '',
+      addToCatalog: true,
+      schedule: false,
+      scheduledLocal: '',
+    },
 
     // Record Pagination
     pageSizeMode: 'auto',

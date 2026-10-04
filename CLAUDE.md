@@ -24,6 +24,7 @@ internal/
   httpapi/                # routes, problem+json, auth middleware, SPA
   dnsx/                   # Client (TransferBackend), ZoneCache, Notify
   catalog/                # Catalog indexer (AXFR + poll + NOTIFY)
+  provision/              # optional rndc addzone/delzone + catalog PTR DDNS
   store/ / scheduler/     # intent DB + apply loop
   config/                 # Settings, secret_file resolution
   ui/dist/                # embedded SPA (go:embed)
@@ -39,6 +40,9 @@ frontend/                 # Alpine.js SPA source
 - Errors: RFC 9457 problem+json (`rcode` / `rcode_description` top-level).
 - Catalog: if `settings.Catalog.Enabled`, `catalog.New` + `Start`, sync into
   cache via goroutine; wire `deps.Catalog`.
+- RNDC: if `settings.RNDC.Enabled`, `provision.New` + `deps.Provisioner`. BIND
+  9.20 has no `initial-file`; use `zone_seed.mode: shared_dir`. Avoid typed-nil
+  `*provision.Provisioner` on the `httpapi.ZoneProvisioner` interface.
 
 ## Commands
 

@@ -215,6 +215,52 @@ catalog:
   remove_stale_zones: false
 
 # =============================================================================
+# RNDC (optional zone create/delete)
+# =============================================================================
+# When enabled, POST /v1/zones and DELETE /v1/zones/{zone} talk to BIND via the
+# RNDC protocol (github.com/davidgroves/rndc-go) and keep the catalog in sync
+# with DDNS. Leave enabled: false unless named has allow-new-zones and a
+# reachable controls socket.
+#
+# Seed modes:
+#   shared_dir    — write db.<zone> into local_dir (must be the same files
+#                   BIND sees at bind_dir). Required for BIND 9.20.
+#   initial_file  — BIND 9.21+ `initial-file` in the addzone statement; no
+#                   shared filesystem. Set zone_seed.initial_file to a BIND-side
+#                   path containing SOA/NS (or an empty template).
+rndc:
+  enabled: false
+  host: bind
+  port: 953
+  algorithm: hmac-sha256
+  # secret: xT7J2kLpN9qRvW4mY8sF1gH5bC3dE6aZ0iO7uP2wX4c=
+  # secret_file: /run/secrets/rndc
+  timeout: 10
+  # view: default
+  zone_seed:
+    mode: shared_dir
+    local_dir: /managed-zones
+    bind_dir: /managed-zones
+    # initial_file: /etc/bind/empty.zone
+  zone_template:
+    # Defaults to dns.update_tsig_key
+    # allow_update_key: dns-api-key
+    # allow_transfer_key: dns-api-key
+    # extra: also-notify { 192.0.2.10 port 5354; };
+  zone_defaults:
+    primary_ns: ns1.example.
+    admin_email: hostmaster.example.
+    nameservers:
+      - ns1.example.
+    ttl: 3600
+    refresh: 3600
+    retry: 600
+    expire: 86400
+    minimum: 60
+  catalog_member_ttl: 3600
+  ready_timeout: 30
+
+# =============================================================================
 # Database (storage for scheduled changes and the audit log)
 # =============================================================================
 # The only persistent state in the system. It holds intent (what to do, when)

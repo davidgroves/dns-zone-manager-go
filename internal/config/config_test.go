@@ -92,6 +92,7 @@ func TestValidationFailures(t *testing.T) {
 		{"bad tsig ref", filepath.Join("testdata", "bad_tsig_ref.yaml"), "unknown key"},
 		{"retention draft", filepath.Join("testdata", "retention_bad_status.yaml"), "active statuses"},
 		{"webhooks enabled", filepath.Join("testdata", "webhooks_enabled.yaml"), "base_url is required"},
+		{"rndc missing host", filepath.Join("testdata", "rndc_missing_host.yaml"), "rndc.host is required"},
 	}
 	missing := filepath.Join("testdata", "missing_dns.yaml")
 	if err := os.WriteFile(missing, []byte("app_name: x\n"), 0o600); err != nil {

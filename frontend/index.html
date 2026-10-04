@@ -208,6 +208,9 @@
                     <template x-if="!loadingZones && zones.length === 0">
                         <div class="empty-state">
                             <p class="text-muted">No zones loaded</p>
+                            <button x-show="rndcStatus && rndcStatus.enabled" @click="openCreateZone()" class="btn btn-ghost btn-sm mt-1">
+                                Create Zone
+                            </button>
                             <button @click="showAddZone = true" class="btn btn-ghost btn-sm mt-1">
                                 Add Non-Catalog Zone
                             </button>
@@ -244,7 +247,10 @@
                     </template>
                 </div>
                 
-                <div style="padding: 0.75rem; border-top: 1px solid var(--border-color);">
+                <div style="padding: 0.75rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.35rem;">
+                    <button x-show="rndcStatus && rndcStatus.enabled" @click="openCreateZone()" class="btn btn-ghost btn-sm" style="width: 100%">
+                        + Create Zone
+                    </button>
                     <button @click="showAddZone = true" class="btn btn-ghost btn-sm" style="width: 100%">
                         + Add Non-Catalog Zone
                     </button>
@@ -553,6 +559,7 @@
                                                 <tr :class="{ 'scheduled-row-selected': selectedScheduledChange && selectedScheduledChange.id === chg.id }">
                                                     <td>
                                                         <strong x-text="chg.name"></strong>
+                                                        <span x-show="chg.kind && chg.kind !== 'records'" class="badge badge-info" style="font-size: 0.6rem; margin-left: 0.25rem;" x-text="chg.kind"></span>
                                                         <div class="text-muted text-sm" x-show="chg.description" x-text="chg.description"></div>
                                                     </td>
                                                     <td x-text="chg.zone.replace(/\.$/, '')"></td>
@@ -921,6 +928,9 @@
                                         </svg>
                                         History
                                     </button>
+                                    <button x-show="rndcStatus && rndcStatus.enabled" @click="showDeleteZoneConfirm = true" class="btn btn-ghost btn-sm" title="Delete zone from BIND">
+                                        Delete zone
+                                    </button>
                                     <button @click="exportZone()" class="btn btn-ghost btn-sm" title="Export zone file">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -1095,6 +1105,71 @@
                 <div class="modal-footer">
                     <button @click="showAddZone = false" class="btn btn-ghost">Cancel</button>
                     <button @click="addZone()" class="btn btn-success" :disabled="!newZoneName">Add</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Create Zone (rndc) Modal -->
+    <template x-if="showCreateZone">
+        <div class="modal-backdrop" @click.self="showCreateZone = false">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>Create Zone</h3>
+                    <button @click="showCreateZone = false" class="btn btn-ghost btn-icon btn-sm">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Zone Name</label>
+                        <input type="text" x-model="createZoneForm.zone" placeholder="new.example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Primary NS</label>
+                        <input type="text" x-model="createZoneForm.primaryNs" placeholder="ns1.example.">
+                    </div>
+                    <div class="form-group">
+                        <label>Admin email</label>
+                        <input type="text" x-model="createZoneForm.adminEmail" placeholder="hostmaster.example.">
+                    </div>
+                    <div class="form-group">
+                        <label>Nameservers (one per line)</label>
+                        <textarea x-model="createZoneForm.nameservers" rows="3"></textarea>
+                    </div>
+                    <label class="checkbox">
+                        <input type="checkbox" x-model="createZoneForm.addToCatalog">
+                        Add to catalog
+                    </label>
+                    <label class="checkbox">
+                        <input type="checkbox" x-model="createZoneForm.schedule">
+                        Schedule instead of applying now
+                    </label>
+                    <div class="form-group" x-show="createZoneForm.schedule">
+                        <label>Scheduled at</label>
+                        <input type="datetime-local" x-model="createZoneForm.scheduledLocal">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button @click="showCreateZone = false" class="btn btn-ghost">Cancel</button>
+                    <button @click="createZone()" class="btn btn-success" :disabled="!createZoneForm.zone || creatingZone">Create</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Delete Zone Confirmation -->
+    <template x-if="showDeleteZoneConfirm">
+        <div class="modal-backdrop" @click.self="showDeleteZoneConfirm = false">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>Delete Zone</h3>
+                    <button @click="showDeleteZoneConfirm = false" class="btn btn-ghost btn-icon btn-sm">×</button>
+                </div>
+                <div class="modal-body">
+                    <p>Delete <strong x-text="selectedZone"></strong> from BIND? This runs <code>rndc delzone -clean</code> and removes catalog membership.</p>
+                </div>
+                <div class="modal-footer">
+                    <button @click="showDeleteZoneConfirm = false" class="btn btn-ghost">Cancel</button>
+                    <button @click="deleteSelectedZone()" class="btn btn-danger" :disabled="deletingZone">Delete</button>
                 </div>
             </div>
         </div>

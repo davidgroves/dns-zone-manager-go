@@ -10,6 +10,11 @@ func resolveSecrets(s *Settings) error {
 		}
 		s.TSIGKeys[i].Secret = sec
 	}
+	sec, err := resolveSecretField(s.RNDC.Secret, s.RNDC.SecretFile)
+	if err != nil {
+		return fmt.Errorf("rndc: %w", err)
+	}
+	s.RNDC.Secret = sec
 	if s.Database.Postgres != nil {
 		if err := resolvePostgresSecrets(s.Database.Postgres); err != nil {
 			return err

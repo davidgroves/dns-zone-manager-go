@@ -70,7 +70,7 @@ func (z *Zone) SetFromAXFR(rrs []dns.RR) error {
 	z.rrsetCount = 0
 	z.recordCount = 0
 
-	for _, rr := range rrs {
+	for _, rr := range dropAXFRTrailerSOA(rrs) {
 		if rr == nil {
 			continue
 		}
@@ -86,6 +86,35 @@ func (z *Zone) SetFromAXFR(rrs []dns.RR) error {
 	}
 	z.rebuildIndex()
 	return nil
+}
+
+// dropAXFRTrailerSOA removes the RFC 5936 end-of-stream SOA. AXFR answers are
+// SOA … SOA; the final SOA is a delimiter, not a second copy of the RRset.
+func dropAXFRTrailerSOA(rrs []dns.RR) []dns.RR {
+	first, last := -1, -1
+	for i, rr := range rrs {
+		if rr == nil || rr.Header().Rrtype == dns.TypeTSIG {
+			continue
+		}
+		if first < 0 {
+			first = i
+		}
+		last = i
+	}
+	if first < 0 || first == last {
+		return rrs
+	}
+	if rrs[first].Header().Rrtype != dns.TypeSOA || rrs[last].Header().Rrtype != dns.TypeSOA {
+		return rrs
+	}
+	out := make([]dns.RR, 0, len(rrs)-1)
+	for i, rr := range rrs {
+		if i == last {
+			continue
+		}
+		out = append(out, rr)
+	}
+	return out
 }
 
 func (z *Zone) insertRR(ownerKey string, rr dns.RR) {
@@ -104,6 +133,12 @@ func (z *Zone) insertRR(ownerKey string, rr dns.RR) {
 		z.rrsetCount++
 	} else if h.Ttl != 0 {
 		rs.TTL = h.Ttl
+	}
+	rdata := RdataText(rr)
+	for _, existing := range rs.Records {
+		if RdataText(existing) == rdata {
+			return
+		}
 	}
 	rs.Records = append(rs.Records, dns.Copy(rr))
 	z.recordCount++

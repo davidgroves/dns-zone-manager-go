@@ -74,6 +74,8 @@ Or pass --url and --api-key options.`,
 		newHistoryCmd(opts),
 		newRollbackCmd(opts),
 		newReverseCmd(opts),
+		newZoneCmd(opts),
+		newRNDCCmd(opts),
 	)
 	return root
 }

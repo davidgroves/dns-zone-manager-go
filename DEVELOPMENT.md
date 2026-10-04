@@ -24,6 +24,7 @@ internal/
   httpapi/              # Huma/chi HTTP API, middleware, SPA
   dnsx/                 # DDNS client, zone cache, NOTIFY
   catalog/              # RFC 9432 catalog indexer
+  provision/            # optional rndc zone create/delete
   store/                # scheduled changes + audit (SQLite/Postgres)
   scheduler/            # apply loop
   config/               # YAML + env loading

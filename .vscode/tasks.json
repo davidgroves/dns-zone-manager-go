@@ -55,7 +55,7 @@
     {
       "label": "BIND",
       "type": "shell",
-      "command": "sudo docker logs -f dns-zone-manager-go_devcontainer-bind-1",
+      "command": "sudo docker logs --tail 100 -f dns-zone-manager-go_devcontainer-bind-1",
       "group": "build",
       "presentation": {
         "reveal": "always",
@@ -67,7 +67,7 @@
     {
       "label": "POSTGRES",
       "type": "shell",
-      "command": "sudo docker logs -f dns-zone-manager-go_devcontainer-postgres-1",
+      "command": "sudo docker logs --tail 100 -f dns-zone-manager-go_devcontainer-postgres-1",
       "group": "build",
       "presentation": {
         "reveal": "always",

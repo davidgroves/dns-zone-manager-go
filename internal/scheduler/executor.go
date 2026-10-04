@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,8 +13,15 @@ import (
 	"github.com/davidgroves/dns-zone-manager-go/internal/logging"
 	"github.com/davidgroves/dns-zone-manager-go/internal/metrics"
 	"github.com/davidgroves/dns-zone-manager-go/internal/notifications"
+	"github.com/davidgroves/dns-zone-manager-go/internal/provision"
 	"github.com/davidgroves/dns-zone-manager-go/internal/store"
 )
+
+// ZoneProvisioner applies zone_create / zone_delete scheduled changes.
+type ZoneProvisioner interface {
+	CreateZone(ctx context.Context, req provision.CreateRequest) (provision.Result, error)
+	DeleteZone(ctx context.Context, zone string, opts provision.DeleteOptions) (provision.Result, error)
+}
 
 // ExecutionResult is the outcome of executing a scheduled change.
 type ExecutionResult struct {
@@ -31,6 +39,7 @@ type ExecuteOpts struct {
 	Actor        *string
 	Trigger      string
 	Log          *slog.Logger
+	Provisioner  ZoneProvisioner
 }
 
 // ExecuteChange builds and sends the DDNS UPDATE for a claimed scheduled change.
@@ -52,6 +61,14 @@ func ExecuteChange(
 	zone := change.Zone
 	if !strings.HasSuffix(zone, ".") {
 		zone += "."
+	}
+
+	kind := change.Kind
+	if kind == "" {
+		kind = store.KindRecords
+	}
+	if kind == store.KindZoneCreate || kind == store.KindZoneDelete {
+		return executeZoneChange(ctx, change, st, opts, kind, zone)
 	}
 
 	if cache != nil {
@@ -185,6 +202,67 @@ func ExecuteChange(
 	}
 	metrics.IncScheduledChangesApplied(trigger)
 
+	return ExecutionResult{
+		Success:     true,
+		Message:     "Change applied successfully",
+		ResultRcode: &rcode,
+		NewSerial:   newSerial,
+	}
+}
+
+func executeZoneChange(
+	ctx context.Context,
+	change *store.ScheduledChange,
+	st *store.Store,
+	opts ExecuteOpts,
+	kind, zone string,
+) ExecutionResult {
+	if opts.Provisioner == nil {
+		return failChange(ctx, st, change.ID, "zone provisioning is not configured", opts, "rndc_not_configured", nil)
+	}
+	var (
+		res provision.Result
+		err error
+	)
+	switch kind {
+	case store.KindZoneCreate:
+		var req provision.CreateRequest
+		if len(change.Payload) > 0 {
+			if uerr := json.Unmarshal(change.Payload, &req); uerr != nil {
+				return failChange(ctx, st, change.ID, "invalid zone_create payload: "+uerr.Error(), opts, "build_error", nil)
+			}
+		}
+		req.Zone = zone
+		res, err = opts.Provisioner.CreateZone(ctx, req)
+	case store.KindZoneDelete:
+		var delOpts provision.DeleteOptions
+		if len(change.Payload) > 0 {
+			if uerr := json.Unmarshal(change.Payload, &delOpts); uerr != nil {
+				return failChange(ctx, st, change.ID, "invalid zone_delete payload: "+uerr.Error(), opts, "build_error", nil)
+			}
+		}
+		res, err = opts.Provisioner.DeleteZone(ctx, zone, delOpts)
+	default:
+		return failChange(ctx, st, change.ID, "unsupported change kind "+kind, opts, "build_error", nil)
+	}
+	if err != nil {
+		return failChange(ctx, st, change.ID, err.Error(), opts, "update_error", nil)
+	}
+	var newSerial *int64
+	if res.Serial != nil {
+		s := int64(*res.Serial)
+		newSerial = &s
+	}
+	rcode := "NOERROR"
+	if _, err := st.MarkApplied(ctx, change.ID, store.MarkAppliedOpts{
+		ResultRcode: &rcode,
+		NewSerial:   newSerial,
+		Actor:       opts.Actor,
+		Trigger:     opts.Trigger,
+	}); err != nil {
+		return ExecutionResult{Success: false, Message: err.Error(), Error: err.Error()}
+	}
+	metrics.IncScheduledChangesApplied(opts.Trigger)
 	return ExecutionResult{
 		Success:     true,
 		Message:     "Change applied successfully",

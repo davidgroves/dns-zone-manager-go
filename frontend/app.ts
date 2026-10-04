@@ -9,6 +9,7 @@ import { createAuthMethods } from './modules/auth';
 import { createHistoryMethods } from './modules/history';
 import { createLiveMethods } from './modules/live';
 import { createNsupdateMethods } from './modules/nsupdate';
+import { createProvisionMethods } from './modules/provision';
 import { createRecordMethods } from './modules/records';
 import { createReverseMethods } from './modules/reverse';
 import { createRouterMethods, parseUrlParams } from './modules/router';
@@ -90,6 +91,7 @@ export function createApp(config: AppConfig) {
   const themeMethods = createThemeMethods(state);
   const authMethods = createAuthMethods(state);
   const zoneMethods = createZoneMethods(state);
+  const provisionMethods = createProvisionMethods(state);
   const recordMethods = createRecordMethods(state);
   const searchMethods = createSearchMethods(state);
   const sortingMethods = createSortingMethods(state);
@@ -108,6 +110,7 @@ export function createApp(config: AppConfig) {
   Object.assign(state, themeMethods);
   Object.assign(state, authMethods);
   Object.assign(state, zoneMethods);
+  Object.assign(state, provisionMethods);
   Object.assign(state, recordMethods);
   Object.assign(state, searchMethods);
   Object.assign(state, sortingMethods);

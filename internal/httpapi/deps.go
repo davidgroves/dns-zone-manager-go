@@ -8,6 +8,7 @@ import (
 	"github.com/davidgroves/dns-zone-manager-go/internal/dnsx"
 	"github.com/davidgroves/dns-zone-manager-go/internal/live"
 	"github.com/davidgroves/dns-zone-manager-go/internal/notifications"
+	"github.com/davidgroves/dns-zone-manager-go/internal/provision"
 	"github.com/davidgroves/dns-zone-manager-go/internal/store"
 )
 
@@ -27,17 +28,25 @@ type NotifyStatusProvider interface {
 	TCPPort() int
 }
 
+// ZoneProvisioner is the optional rndc-backed zone create/delete backend.
+type ZoneProvisioner interface {
+	CreateZone(ctx context.Context, req provision.CreateRequest) (provision.Result, error)
+	DeleteZone(ctx context.Context, zone string, opts provision.DeleteOptions) (provision.Result, error)
+	Status(ctx context.Context) provision.Status
+}
+
 // Deps holds shared dependencies for the HTTP API.
 type Deps struct {
-	Settings *config.Settings
-	Auth     *auth.Combined
-	Client   *dnsx.Client
-	Cache    *dnsx.ZoneCache
-	Store    *store.Store
-	Hub      *live.Hub
-	Catalog  CatalogIndexer
-	Notify   NotifyStatusProvider
-	Emitter  *notifications.EventEmitter
+	Settings    *config.Settings
+	Auth        *auth.Combined
+	Client      *dnsx.Client
+	Cache       *dnsx.ZoneCache
+	Store       *store.Store
+	Hub         *live.Hub
+	Catalog     CatalogIndexer
+	Notify      NotifyStatusProvider
+	Emitter     *notifications.EventEmitter
+	Provisioner ZoneProvisioner
 
 	// UIDir, when set, serves SPA files from this directory instead of the
 	// assets embedded at build time. Used by local dev so `go run` can serve

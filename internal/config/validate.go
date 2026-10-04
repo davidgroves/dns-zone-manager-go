@@ -50,6 +50,38 @@ func validate(s *Settings) error {
 	if err := validateThemeLogo(s.Theme.Logo); err != nil {
 		return err
 	}
+	if err := validateRNDC(&s.RNDC); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateRNDC(r *RNDCSettings) error {
+	if !r.Enabled {
+		return nil
+	}
+	if strings.TrimSpace(r.Host) == "" {
+		return fmt.Errorf("rndc.host is required when rndc is enabled")
+	}
+	if r.Secret.IsZero() {
+		return fmt.Errorf("rndc.secret or rndc.secret_file is required when rndc is enabled")
+	}
+	mode := strings.ToLower(strings.TrimSpace(r.ZoneSeed.Mode))
+	switch mode {
+	case RNDCSeedSharedDir:
+		if strings.TrimSpace(r.ZoneSeed.LocalDir) == "" {
+			return fmt.Errorf("rndc.zone_seed.local_dir is required when zone_seed.mode is shared_dir")
+		}
+		if strings.TrimSpace(r.ZoneSeed.BindDir) == "" {
+			return fmt.Errorf("rndc.zone_seed.bind_dir is required when zone_seed.mode is shared_dir")
+		}
+	case RNDCSeedInitialFile:
+		if strings.TrimSpace(r.ZoneSeed.InitialFile) == "" {
+			return fmt.Errorf("rndc.zone_seed.initial_file is required when zone_seed.mode is initial_file")
+		}
+	default:
+		return fmt.Errorf("rndc.zone_seed.mode must be %s or %s", RNDCSeedSharedDir, RNDCSeedInitialFile)
+	}
 	return nil
 }
 
@@ -102,6 +134,14 @@ func validateTSIGRefs(s *Settings) error {
 	}
 	if s.Notify.TSIGKey != nil {
 		if err := check("notify.tsig_key", *s.Notify.TSIGKey); err != nil {
+			return err
+		}
+	}
+	if s.RNDC.Enabled {
+		if err := check("rndc.zone_template.allow_update_key", s.RNDC.ZoneTemplate.AllowUpdateKey); err != nil {
+			return err
+		}
+		if err := check("rndc.zone_template.allow_transfer_key", s.RNDC.ZoneTemplate.AllowTransferKey); err != nil {
 			return err
 		}
 	}

@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/davidgroves/dns-zone-manager-go/internal/config"
 	"github.com/davidgroves/dns-zone-manager-go/internal/dnsx"
 	"github.com/davidgroves/dns-zone-manager-go/internal/httpapi"
+	"github.com/davidgroves/dns-zone-manager-go/internal/provision"
 )
 
 func testSettings() *config.Settings {
@@ -411,5 +413,105 @@ func TestCursorEncodeDecodeVariants(t *testing.T) {
 	}
 	if gd.Z != "example.com." || gd.N != "www.example.com." {
 		t.Fatalf("%+v", gd)
+	}
+}
+
+type fakeProvisioner struct {
+	status    provision.Status
+	create    provision.Result
+	createErr error
+	delete    provision.Result
+	deleteErr error
+	created   []provision.CreateRequest
+	deleted   []string
+}
+
+func (f *fakeProvisioner) CreateZone(_ context.Context, req provision.CreateRequest) (provision.Result, error) {
+	f.created = append(f.created, req)
+	if f.createErr != nil {
+		return provision.Result{}, f.createErr
+	}
+	res := f.create
+	if res.Zone == "" {
+		res.Zone = req.Zone
+	}
+	return res, nil
+}
+
+func (f *fakeProvisioner) DeleteZone(_ context.Context, zone string, _ provision.DeleteOptions) (provision.Result, error) {
+	f.deleted = append(f.deleted, zone)
+	if f.deleteErr != nil {
+		return provision.Result{}, f.deleteErr
+	}
+	res := f.delete
+	if res.Zone == "" {
+		res.Zone = zone
+	}
+	return res, nil
+}
+
+func (f *fakeProvisioner) Status(context.Context) provision.Status { return f.status }
+
+func TestRNDCStatusDisabled(t *testing.T) {
+	h := testHandler(t)
+	code, body, _ := doJSON(t, h, http.MethodGet, "/v1/rndc/status")
+	if code != http.StatusOK {
+		t.Fatalf("status %d", code)
+	}
+	if body["enabled"] != false {
+		t.Fatalf("body=%v", body)
+	}
+}
+
+func TestCreateZoneRequiresRNDC(t *testing.T) {
+	h := testHandler(t)
+	req := httptest.NewRequest(http.MethodPost, "/v1/zones", strings.NewReader(`{"zone":"new.example."}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotImplemented {
+		t.Fatalf("got %d %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestCreateAndDeleteZoneWithProvisioner(t *testing.T) {
+	settings := testSettings()
+	serial := uint32(1)
+	fp := &fakeProvisioner{
+		status: provision.Status{Enabled: true, Connected: true, Host: "bind", Port: 953},
+		create: provision.Result{Zone: "new.example.", Serial: &serial, CatalogAdded: true, SeedMode: "shared_dir"},
+		delete: provision.Result{Zone: "new.example.", CatalogRemoved: true},
+	}
+	h := httpapi.New(httpapi.Deps{
+		Settings:    settings,
+		Auth:        auth.NewCombined(settings),
+		Provisioner: fp,
+		DNSReady:    func(context.Context) bool { return true },
+		StoreReady:  func(context.Context) bool { return true },
+	})
+	code, body, _ := doJSON(t, h, http.MethodGet, "/v1/rndc/status")
+	if code != 200 || body["enabled"] != true {
+		t.Fatalf("status %d %v", code, body)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/zones", bytes.NewReader([]byte(`{"zone":"new.example"}`)))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create %d %s", rr.Code, rr.Body.String())
+	}
+	if len(fp.created) != 1 || fp.created[0].Zone != "new.example" {
+		t.Fatalf("created=%+v", fp.created)
+	}
+
+	del := httptest.NewRequest(http.MethodDelete, "/v1/zones/new.example.", nil)
+	rr2 := httptest.NewRecorder()
+	h.ServeHTTP(rr2, del)
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("delete %d %s", rr2.Code, rr2.Body.String())
+	}
+	if len(fp.deleted) != 1 {
+		t.Fatalf("deleted=%v", fp.deleted)
 	}
 }

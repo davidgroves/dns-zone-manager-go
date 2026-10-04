@@ -26,24 +26,29 @@ import (
 	"github.com/davidgroves/dns-zone-manager-go/internal/dnsx"
 	"github.com/davidgroves/dns-zone-manager-go/internal/httpapi"
 	"github.com/davidgroves/dns-zone-manager-go/internal/live"
+	"github.com/davidgroves/dns-zone-manager-go/internal/provision"
 	"github.com/davidgroves/dns-zone-manager-go/internal/store"
 )
 
 // bindAPIStack is a BIND container plus an HTTP API wired to it.
 type bindAPIStack struct {
-	Zone     string
-	BaseURL  string // set when serveHTTP is true
-	Handler  http.Handler
-	Settings *config.Settings
-	Client   *dnsx.Client
-	Cache    *dnsx.ZoneCache
-	Store    *store.Store
-	Server   *httptest.Server
+	Zone        string
+	CatalogZone string
+	BaseURL     string // set when serveHTTP is true
+	Handler     http.Handler
+	Settings    *config.Settings
+	Client      *dnsx.Client
+	Cache       *dnsx.ZoneCache
+	Store       *store.Store
+	Server      *httptest.Server
+	ZoneDir     string
+	Provisioner httpapi.ZoneProvisioner
 }
 
 type stackOptions struct {
 	withStore bool
 	serveHTTP bool
+	withRNDC  bool
 }
 
 // startBINDAPI starts BIND via testcontainers, loads the test zone, and builds
@@ -57,16 +62,24 @@ func startBINDAPI(t *testing.T, opts stackOptions) *bindAPIStack {
 	_, err := rand.Read(secret)
 	require.NoError(t, err)
 	secretB64 := base64.StdEncoding.EncodeToString(secret)
+	rndcSecret := make([]byte, 32)
+	_, err = rand.Read(rndcSecret)
+	require.NoError(t, err)
+	rndcSecretB64 := base64.StdEncoding.EncodeToString(rndcSecret)
 	keyName := "integration-test-key"
 	zone := "test.example."
 
 	dir, hostDir := bindConfigDir(t)
-	writeBindConfig(t, dir, keyName, secretB64, zone)
+	writeBindConfig(t, dir, keyName, secretB64, zone, bindExtra{withRNDC: opts.withRNDC, rndcSecretB64: rndcSecretB64})
 
+	ports := []string{"53/tcp", "53/udp"}
+	if opts.withRNDC {
+		ports = append(ports, "953/tcp")
+	}
 	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:        "internetsystemsconsortium/bind9:9.20",
-			ExposedPorts: []string{"53/tcp", "53/udp"},
+			ExposedPorts: ports,
 			Env:          map[string]string{"TZ": "UTC", "BIND9_USER": "root"},
 			WaitingFor:   wait.ForListeningPort("53/tcp").WithStartupTimeout(90 * time.Second),
 			HostConfigModifier: func(hc *container.HostConfig) {
@@ -87,6 +100,12 @@ func startBINDAPI(t *testing.T, opts stackOptions) *bindAPIStack {
 	require.NoError(t, err)
 	udpPort, err := c.MappedPort(ctx, "53/udp")
 	require.NoError(t, err)
+	rndcPort := ""
+	if opts.withRNDC {
+		p, err := c.MappedPort(ctx, "953/tcp")
+		require.NoError(t, err)
+		rndcPort = p.Port()
+	}
 
 	dbPath := ""
 	if opts.withStore {
@@ -96,6 +115,8 @@ func startBINDAPI(t *testing.T, opts stackOptions) *bindAPIStack {
 		host: host, udpPort: udpPort.Port(), tcpPort: tcpPort.Port(),
 		keyName: keyName, secretB64: secretB64,
 		withStore: opts.withStore, dbPath: dbPath,
+		withRNDC: opts.withRNDC, rndcPort: rndcPort, rndcSecretB64: rndcSecretB64,
+		zoneDir: filepath.Join(dir, "zones"),
 	})
 	settings, err := config.Load(cfgPath)
 	require.NoError(t, err)
@@ -125,24 +146,32 @@ func startBINDAPI(t *testing.T, opts stackOptions) *bindAPIStack {
 		MaxConnections: 10, MaxConnectionsPerIP: 5,
 		SendTimeout: time.Second, PingInterval: time.Minute,
 	})
+	var prov httpapi.ZoneProvisioner
+	if opts.withRNDC {
+		prov = provision.New(settings, client, cache, nil, st)
+	}
 	handler := httpapi.New(httpapi.Deps{
-		Settings:   settings,
-		Auth:       auth.NewCombined(settings),
-		Client:     client,
-		Cache:      cache,
-		Store:      st,
-		Hub:        hub,
-		DNSReady:   func(context.Context) bool { return true },
-		StoreReady: func(context.Context) bool { return st == nil || st.Ping(context.Background()) },
+		Settings:    settings,
+		Auth:        auth.NewCombined(settings),
+		Client:      client,
+		Cache:       cache,
+		Store:       st,
+		Hub:         hub,
+		Provisioner: prov,
+		DNSReady:    func(context.Context) bool { return true },
+		StoreReady:  func(context.Context) bool { return st == nil || st.Ping(context.Background()) },
 	})
 
 	stack := &bindAPIStack{
-		Zone:     zone,
-		Handler:  handler,
-		Settings: settings,
-		Client:   client,
-		Cache:    cache,
-		Store:    st,
+		Zone:        zone,
+		CatalogZone: "catalog.test.",
+		Handler:     handler,
+		Settings:    settings,
+		Client:      client,
+		Cache:       cache,
+		Store:       st,
+		ZoneDir:     filepath.Join(dir, "zones"),
+		Provisioner: prov,
 	}
 	if opts.serveHTTP {
 		srv := httptest.NewServer(handler)
@@ -193,8 +222,29 @@ func workspaceHostPath() string {
 	return strings.TrimSpace(string(out))
 }
 
-func writeBindConfig(t *testing.T, dir, keyName, secretB64, zone string) {
+func writeBindConfig(t *testing.T, dir, keyName, secretB64, zone string, extra bindExtra) {
 	t.Helper()
+	rndcBlock := ""
+	catalogBlock := ""
+	if extra.withRNDC {
+		rndcBlock = fmt.Sprintf(`
+key "rndc-key" {
+    algorithm hmac-sha256;
+    secret "%s";
+};
+controls {
+    inet * port 953 allow { any; } keys { "rndc-key"; };
+};
+`, extra.rndcSecretB64)
+		catalogBlock = fmt.Sprintf(`
+zone "catalog.test" {
+    type primary;
+    file "/etc/bind/zones/catalog.test.zone";
+    allow-update { key %s; };
+    allow-transfer { key %s; };
+};
+`, keyName, keyName)
+	}
 	namedConf := fmt.Sprintf(`
 options {
     directory "/var/cache/bind";
@@ -204,18 +254,21 @@ options {
     allow-transfer { any; };
     recursion no;
     dnssec-validation no;
+    allow-new-zones %s;
 };
 key "%s" {
     algorithm hmac-sha256;
     secret "%s";
 };
+%s
 zone "%s" {
     type primary;
     file "/etc/bind/zones/test.example.zone";
     allow-update { key %s; };
     allow-transfer { key %s; };
 };
-`, keyName, secretB64, zone, keyName, keyName)
+%s
+`, boolYes(extra.withRNDC), keyName, secretB64, rndcBlock, zone, keyName, keyName, catalogBlock)
 
 	zoneFile := fmt.Sprintf(`$ORIGIN %s
 $TTL 3600
@@ -231,12 +284,36 @@ www IN A 192.0.2.10
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "zones", "test.example.zone"), []byte(zoneFile), 0o666))
 	_ = os.Chmod(filepath.Join(dir, "zones"), 0o777)
 	_ = os.Chmod(filepath.Join(dir, "zones", "test.example.zone"), 0o666)
+	if extra.withRNDC {
+		cat := `$ORIGIN catalog.test.
+$TTL 3600
+@ IN SOA ns.catalog.test. host.catalog.test. ( 1 3600 600 86400 60 )
+@ IN NS invalid.
+version IN TXT "2"
+`
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "zones", "catalog.test.zone"), []byte(cat), 0o666))
+		_ = os.Chmod(filepath.Join(dir, "zones", "catalog.test.zone"), 0o666)
+	}
+}
+
+func boolYes(v bool) string {
+	if v {
+		return "yes"
+	}
+	return "no"
+}
+
+type bindExtra struct {
+	withRNDC      bool
+	rndcSecretB64 string
 }
 
 type appConfigParams struct {
 	host, udpPort, tcpPort, keyName, secretB64 string
 	withStore                                  bool
 	dbPath                                     string
+	withRNDC                                   bool
+	rndcPort, rndcSecretB64, zoneDir           string
 }
 
 func writeAppConfig(t *testing.T, p appConfigParams) string {
@@ -263,6 +340,38 @@ database:
   path: %q
 `, p.dbPath)
 	}
+	catalogBlock := `
+catalog:
+  enabled: false
+`
+	rndcBlock := ""
+	if p.withRNDC {
+		catalogBlock = `
+catalog:
+  enabled: true
+  zone_name: catalog.test.
+  poll_interval: 60
+  auto_load_zones: false
+  remove_stale_zones: false
+`
+		rndcBlock = fmt.Sprintf(`
+rndc:
+  enabled: true
+  host: %s
+  port: %s
+  algorithm: hmac-sha256
+  secret: %s
+  zone_seed:
+    mode: shared_dir
+    local_dir: %q
+    bind_dir: /etc/bind/zones
+  zone_defaults:
+    primary_ns: ns1.test.example.
+    admin_email: hostmaster.test.example.
+    nameservers:
+      - ns1.test.example.
+`, p.host, p.rndcPort, p.rndcSecretB64, p.zoneDir)
+	}
 	cfgYAML := fmt.Sprintf(`
 debug: true
 tsig_keys:
@@ -288,15 +397,15 @@ notify:
   enabled: false
 %s
 %s
-catalog:
-  enabled: false
+%s
+%s
 webhooks:
   enabled: false
 logging:
   format: text
   level: INFO
   sample_rate: 1.0
-`, p.keyName, p.secretB64, p.host, p.udpPort, p.tcpPort, p.keyName, p.keyName, schedulerBlock, databaseBlock)
+`, p.keyName, p.secretB64, p.host, p.udpPort, p.tcpPort, p.keyName, p.keyName, schedulerBlock, databaseBlock, catalogBlock, rndcBlock)
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	require.NoError(t, os.WriteFile(path, []byte(cfgYAML), 0o600))
 	return path

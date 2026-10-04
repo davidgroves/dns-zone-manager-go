@@ -272,12 +272,16 @@ func registerScheduled(api huma.API, d *Deps) {
 		if err := requireStore(); err != nil {
 			return nil, err
 		}
-		if d.Client == nil {
-			return nil, unavailable("DNS client not initialized")
-		}
 		ch, err := d.Store.Get(ctx, in.ChangeID, false)
 		if err != nil || ch == nil {
 			return nil, notFound("change not found")
+		}
+		kind := ch.Kind
+		if kind == "" {
+			kind = store.KindRecords
+		}
+		if kind == store.KindRecords && d.Client == nil {
+			return nil, unavailable("DNS client not initialized")
 		}
 		u, _ := userFrom(ctx)
 		if _, err := d.Store.MarkRunning(ctx, ch.ID, "manual-apply", 2*time.Minute); err != nil {
@@ -286,7 +290,7 @@ func registerScheduled(api huma.API, d *Deps) {
 		ch, _ = d.Store.Get(ctx, in.ChangeID, false)
 		result := scheduler.ExecuteChange(ctx, ch, d.Store, d.Client, d.Cache, scheduler.ExecuteOpts{
 			MaxAttempts: d.Settings.Scheduler.MaxAttempts, RetryBackoff: d.Settings.Scheduler.RetryBackoff,
-			Actor: actorPtr(u.ID), Trigger: notifications.TriggerManual,
+			Actor: actorPtr(u.ID), Trigger: notifications.TriggerManual, Provisioner: d.Provisioner,
 		})
 		status := store.StatusApplied
 		if !result.Success {
@@ -316,6 +320,26 @@ func registerScheduled(api huma.API, d *Deps) {
 		ch, err := d.Store.Get(ctx, in.ChangeID, false)
 		if err != nil || ch == nil {
 			return nil, notFound("change not found")
+		}
+		kind := ch.Kind
+		if kind == "" {
+			kind = store.KindRecords
+		}
+		if kind == store.KindZoneCreate || kind == store.KindZoneDelete {
+			action := "create"
+			if kind == store.KindZoneDelete {
+				action = "delete"
+			}
+			return &struct{ Body map[string]any }{Body: map[string]any{
+				"change_id":                ch.ID,
+				"zone":                     normalizeZone(ch.Zone),
+				"kind":                     kind,
+				"prerequisites":            []any{},
+				"all_prerequisites_passed": true,
+				"conflicts":                []any{},
+				"operations_count":         0,
+				"message":                  "Zone " + action + " will be applied via rndc",
+			}}, nil
 		}
 		zone := normalizeZone(ch.Zone)
 		lookup, typesAt := cacheLookupFuncs(d, zone)

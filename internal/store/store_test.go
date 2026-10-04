@@ -314,4 +314,22 @@ func TestCancelAndCountPending(t *testing.T) {
 	}
 }
 
+func TestJSONTextValueIsString(t *testing.T) {
+	j, err := store.MarshalJSON(map[string]any{"zone": "foo.bar."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := j.Value()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, ok := v.(string)
+	if !ok {
+		t.Fatalf("Value type %T, want string so Postgres JSON is not bound as bytea", v)
+	}
+	if s == "" || s[0] != '{' {
+		t.Fatalf("Value %q", s)
+	}
+}
+
 func strPtr(s string) *string { return &s }

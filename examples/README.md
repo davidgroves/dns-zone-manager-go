@@ -173,6 +173,24 @@ send
 
 The API will automatically discover and load the new zone.
 
+### Creating a zone with rndc
+
+This stack enables `rndc` on the API (`allow-new-zones yes` in BIND). The API
+writes a seed zone file into the shared `managed-zones` volume, runs
+`rndc addzone`, then adds a catalog PTR via DDNS:
+
+```bash
+curl -s -X POST http://localhost:8000/v1/zones \
+  -H "X-API-Key: demo-api-key-12345" \
+  -H "Content-Type: application/json" \
+  -d '{"zone":"newzone.example."}' | jq
+
+dns-cli zone create newzone.example.
+dns-cli zone delete newzone.example.
+```
+
+BIND 9.20 does not support `initial-file`; keep `rndc.zone_seed.mode: shared_dir`.
+
 ## Testing the API
 
 ### List Zones
