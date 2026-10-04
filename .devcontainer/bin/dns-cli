@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Always run the workspace dns-cli (go build cache keeps this cheap).
+set -euo pipefail
+cd /workspace
+exec go run ./cmd/dns-cli "$@"

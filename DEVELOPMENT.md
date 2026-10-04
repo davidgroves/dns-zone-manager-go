@@ -61,6 +61,14 @@ npm run typecheck
 ./tests.sh --report test-report.pdf   # same run, plus a PDF summary
 ```
 
+Go integration tests (`//go:build integration`) need Docker. They cover BIND-backed
+API checks and **dns-cli E2E** (`TestDNSCLI`): the CLI binary is built and run against
+an httptest API with BIND + SQLite. Run only the CLI suite with:
+
+```bash
+go test -tags=integration ./tests/integration/ -count=1 -run DNSCLI
+```
+
 ## OpenAPI types
 
 With the server listening:

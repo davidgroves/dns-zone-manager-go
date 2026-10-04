@@ -1,5 +1,6 @@
 # Binaries / build output
 bin/
+!.devcontainer/bin/
 /dist/
 internal/ui/dist/*
 !internal/ui/dist/index.html

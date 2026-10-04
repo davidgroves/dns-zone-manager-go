@@ -34,7 +34,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 # download. iPad E2E projects use WebKit under the hood.
 # Pin the installer to the lockfile version so the image matches package-lock.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-COPY package.json package-lock.json /tmp/playwright-install/
+COPY package.json package-lock.json .npmrc /tmp/playwright-install/
 WORKDIR /tmp/playwright-install
 RUN npm ci --ignore-scripts \
     && npx playwright install --with-deps \
