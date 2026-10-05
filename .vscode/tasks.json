@@ -4,7 +4,7 @@
     {
       "label": "Build SPA",
       "type": "shell",
-      "command": "npx tsc && npx vite build",
+      "command": "npx vite build",
       "group": "build",
       "presentation": {
         "reveal": "silent",
@@ -15,7 +15,7 @@
     {
       "label": "BACKEND",
       "type": "shell",
-      "command": "go run ./cmd/dns-zone-manager serve --config .devcontainer/config.devcontainer.yaml --ui-dir dist",
+      "command": "until pg_isready -h postgres -p 5432 -U dns_zone_manager -d dns_zone_manager 2>/dev/null; do echo 'Waiting for postgres (start the POSTGRES task if it is not running)...'; sleep 2; done && go run ./cmd/dns-zone-manager serve --config .devcontainer/config.devcontainer.yaml --ui-dir dist",
       "dependsOn": ["Build SPA"],
       "group": "build",
       "presentation": {
@@ -42,7 +42,7 @@
     {
       "label": "BIND",
       "type": "shell",
-      "command": "sudo docker logs --tail 100 -f dns-zone-manager-go_devcontainer-bind-1",
+      "command": "proj=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; bind=\"${proj}-bind-1\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" up -d bind && sudo docker exec \"$bind\" mkdir -p /etc/bind/zones-source && sudo docker cp /workspace/.devcontainer/named.conf.devcontainer \"${bind}:/etc/bind/named.conf\" && sudo docker cp /workspace/examples/bind/zones/. \"${bind}:/etc/bind/zones-source/\" && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" logs --tail 100 -f bind",
       "group": "build",
       "presentation": {
         "reveal": "always",
@@ -54,7 +54,7 @@
     {
       "label": "POSTGRES",
       "type": "shell",
-      "command": "sudo docker logs --tail 100 -f dns-zone-manager-go_devcontainer-postgres-1",
+      "command": "proj=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" up -d --no-recreate postgres && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" logs --tail 100 -f postgres",
       "group": "build",
       "presentation": {
         "reveal": "always",
@@ -66,7 +66,7 @@
     {
       "label": "LGTM",
       "type": "shell",
-      "command": "proj=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" up -d lgtm && echo '\\nGrafana: http://localhost:3000  (Loki + metrics dashboards)\\n' && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" logs --tail 100 -f lgtm",
+      "command": "proj=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; lgtm=\"${proj}-lgtm-1\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" up -d lgtm && sudo docker exec \"$lgtm\" mkdir -p /otel-lgtm/grafana/conf/provisioning/dashboards/custom && sudo docker cp /workspace/examples/observability/otelcol-config.yaml \"${lgtm}:/otel-lgtm/otelcol-config.yaml\" && sudo docker cp /workspace/examples/observability/dashboards/provisioning.yaml \"${lgtm}:/otel-lgtm/grafana/conf/provisioning/dashboards/custom.yaml\" && sudo docker cp /workspace/examples/observability/dashboards/dns-zone-manager.json \"${lgtm}:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/dns-zone-manager.json\" && sudo docker cp /workspace/examples/observability/dashboards/performance.json \"${lgtm}:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/performance.json\" && sudo docker restart \"$lgtm\" && echo '\\nGrafana: http://localhost:3000  (Loki + metrics dashboards)\\n' && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" logs --tail 100 -f lgtm",
       "group": "build",
       "presentation": {
         "reveal": "always",

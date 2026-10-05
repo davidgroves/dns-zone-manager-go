@@ -3,6 +3,7 @@
   "dockerComposeFile": "docker-compose.yml",
   "service": "dev",
   "workspaceFolder": "/workspace",
+  "runServices": ["dev"],
   "shutdownAction": "stopCompose",
   "initializeCommand": "bash .devcontainer/initialize.sh",
   "remoteEnv": {
@@ -13,7 +14,7 @@
     "DNS_API_KEY": "dev",
     "PATH": "/workspace/.devcontainer/bin:${containerEnv:PATH}"
   },
-  "postCreateCommand": "npm install && go mod download && pre-commit install && pre-commit install-hooks",
+  "postCreateCommand": "git config --global --add safe.directory /workspace && npm install && go mod download && pre-commit install && pre-commit install-hooks",
   "postStartCommand": "if [ -S /var/run/docker.sock ]; then DOCKER_GID=$(stat -c '%g' /var/run/docker.sock 2>/dev/null || stat -f '%g' /var/run/docker.sock 2>/dev/null); if [ -n \"$DOCKER_GID\" ]; then getent group docker >/dev/null 2>&1 || sudo groupadd -g $DOCKER_GID docker 2>/dev/null || sudo groupadd docker 2>/dev/null || true; getent group docker >/dev/null 2>&1 && sudo usermod -aG docker vscode 2>/dev/null || true; fi; sudo chmod 666 /var/run/docker.sock 2>/dev/null || true; fi && echo '\\n✅ Devcontainer ready!\\n\\n🚀 Start services:\\n   Cmd/Ctrl+Shift+P → Tasks: Run Build Task\\n   Or: Terminal → Run Build Task\\n\\n🔗 URLs (after starting):\\n   App:  http://localhost:8000  (API + web UI)\\n   Docs: http://localhost:8000/docs\\n   Grafana:  http://localhost:3000  (Loki + metrics dashboards)\\n   Auth:     disabled (anonymous)\\n\\n🖥️  dns-cli (after the API is up):\\n   dns-cli list zones\\n   dns-cli list records example.com.\\n   dns-cli schedule list\\n   dns-cli zone create new.example.\\n   dns-cli rndc status\\n\\n🧪 Testing:\\n   ./tests.sh              # Unit tests only\\n   ./tests.sh --all        # All tests (unit + integration + E2E)\\n   npm run test:e2e:ui     # Playwright UI → http://localhost:9323\\n   npm run test:e2e:report # Test report  → http://localhost:9324\\n\\n🔧 DNS Tools (dig):\\n   dig @bind -p 15353 example.com           # Query A record\\n   dig @bind -p 15353 example.com ANY        # Query all records\\n   dig @bind -p 15353 example.com SOA +short # SOA serial\\n\\n📦 Zone Transfers (AXFR/IXFR):\\n   dig @bind -p 15353 example.com AXFR -k /etc/dns-api-key.conf\\n   dig @bind -p 15353 example.com IXFR=12345 -k /etc/dns-api-key.conf\\n\\n✏️  Dynamic Updates (nsupdate):\\n   nsupdate -k /etc/dns-api-key.conf <<EOF\\n   server bind 15353\\n   zone example.com\\n   update add test.example.com 300 A 192.0.2.100\\n   send\\n   EOF\\n\\n🔧 RNDC Server Control:\\n   rndc status\\n   rndc zonestatus example.com\\n\\n🗄️  Scheduled Change Store (PostgreSQL):\\n   psql postgresql://dns_zone_manager:devpassword@postgres:5432/dns_zone_manager\\n   psql ... -c \"SELECT id, name, zone, status FROM scheduled_changes;\"\\n   Host clients: localhost:15432 (data resets on container restart)\\n'",
   "forwardPorts": [5173, 8000, 3000, 4317, 4318, 9323, 9324, 15432],
   "portsAttributes": {
