@@ -1,4 +1,8 @@
-.PHONY: build test test-race test-integration lint fmt tidy run frontend-build docker-build types-generate
+.PHONY: build test test-race test-integration lint fmt tidy run frontend-build docker-build devcontainer-image types-generate
+
+DEVCONTAINER_IMAGE ?= ghcr.io/davidgroves/dns-zone-manager-devcontainer:latest
+# Platforms for the multi-arch devcontainer image (Apple Silicon + Intel/Linux).
+DEVCONTAINER_PLATFORMS ?= linux/amd64,linux/arm64
 
 VERSION ?= $(shell ./scripts/app-version.sh)
 LDFLAGS := -X github.com/davidgroves/dns-zone-manager-go/internal/version.Version=$(VERSION)
@@ -43,6 +47,14 @@ frontend-build:
 
 docker-build:
 	docker build --build-arg VERSION=$(VERSION) -t dns-zone-manager:$(DOCKER_TAG) .
+
+# Build and push the multi-arch Dev Container image to GHCR. CI normally does
+# this (.github/workflows/devcontainer-image.yml); use this for a manual publish
+# after editing .devcontainer/Dockerfile. Requires `docker login ghcr.io`.
+devcontainer-image:
+	docker buildx build --platform $(DEVCONTAINER_PLATFORMS) \
+		-f .devcontainer/Dockerfile \
+		-t $(DEVCONTAINER_IMAGE) --push .
 
 types-generate:
 	npm run types:generate

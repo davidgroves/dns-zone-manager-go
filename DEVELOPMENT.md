@@ -10,17 +10,30 @@ In Cursor or VS Code: clone the repo, install the Dev Containers extension,
 then **Reopen in Container**. First create runs `npm install`, `go mod
 download`, and pre-commit. Auth is off in this config (anonymous admin).
 
-## macOS (Docker Desktop)
+## The dev image is prebuilt (pulled, not built)
 
-The devcontainer uses Debian Trixie (Debian 13) as its base. Bookworm (Debian 12)
-shipped `apt 2.6.1` which has a bug verifying GPG signatures in Docker Desktop's
-network environment, causing `apt-get update` to fail with
-`At least one invalid signature was encountered` on every repository. Trixie
-ships `apt 3.0.3` which resolves this.
+The `dev` service uses a prebuilt image published to GHCR
+(`ghcr.io/davidgroves/dns-zone-manager-devcontainer:latest`), not a local
+`build:`. Reopening in the container **pulls** that image rather than building
+one on your machine. This is what makes clone-and-go work the same on macOS
+(Docker Desktop) and Linux: building a complex image locally is where the
+cross-platform friction lives (Docker Desktop's apt GPG verification, VM clock
+drift, and BuildKit `fs.read` entitlement checks all only bite during a local
+build). The image is multi-arch, so Apple Silicon (`linux/arm64`) and
+Intel/Linux (`linux/amd64`) both get a native image.
 
-The `initializeCommand` (`initialize.sh`) also syncs the Docker Desktop VM clock
-before each container start (`docker run --privileged alpine hwclock -s`), as
-clock drift after sleep/wake can cause unrelated GPG timestamp failures.
+### Changing the dev image
+
+Edit `.devcontainer/Dockerfile`, then publish a new image one of two ways:
+
+- **CI (preferred):** push the change to `main`. The
+  `.github/workflows/devcontainer-image.yml` workflow rebuilds and pushes
+  `:latest` (and a commit-SHA tag). It also runs on `workflow_dispatch`.
+- **Manually:** `docker login ghcr.io` then `make devcontainer-image` (builds
+  both arches via buildx and pushes `:latest`).
+
+The base is Debian Trixie (Debian 13): Bookworm shipped `apt 2.6.1`, which has a
+GPG-signature verification bug; Trixie's `apt 3.0.3` resolves it.
 
 The API does **not** start with the container. Use **Tasks** after attach:
 
