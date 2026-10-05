@@ -14,9 +14,12 @@
 services:
   # Development container - VS Code/Cursor connects here
   dev:
-    build:
-      context: ..
-      dockerfile: .devcontainer/Dockerfile
+    # Prebuilt dev image pulled from GHCR (built by .github/workflows/
+    # devcontainer-image.yml). Nothing builds on the user's machine, so clone ->
+    # Reopen in Container is a pull, not a build. To change the image, edit
+    # .devcontainer/Dockerfile and run `make devcontainer-image` (or push to main
+    # / trigger the workflow). See DEVELOPMENT.md.
+    image: ghcr.io/davidgroves/dns-zone-manager-devcontainer:latest
     volumes:
       - ..:/workspace:cached
       - /var/run/docker.sock:/var/run/docker.sock  # Access to Docker for viewing logs
