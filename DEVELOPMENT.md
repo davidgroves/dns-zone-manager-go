@@ -10,6 +10,18 @@ In Cursor or VS Code: clone the repo, install the Dev Containers extension,
 then **Reopen in Container**. First create runs `npm install`, `go mod
 download`, and pre-commit. Auth is off in this config (anonymous admin).
 
+## macOS (Docker Desktop)
+
+The devcontainer uses Debian Trixie (Debian 13) as its base. Bookworm (Debian 12)
+shipped `apt 2.6.1` which has a bug verifying GPG signatures in Docker Desktop's
+network environment, causing `apt-get update` to fail with
+`At least one invalid signature was encountered` on every repository. Trixie
+ships `apt 3.0.3` which resolves this.
+
+The `initializeCommand` (`initialize.sh`) also syncs the Docker Desktop VM clock
+before each container start (`docker run --privileged alpine hwclock -s`), as
+clock drift after sleep/wake can cause unrelated GPG timestamp failures.
+
 The API does **not** start with the container. Use **Tasks** after attach:
 
 - **Terminal → Run Task…** (or Command Palette → **Tasks: Run Task**)

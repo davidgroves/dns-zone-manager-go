@@ -19,8 +19,13 @@ removed=0
 while IFS= read -r id; do
   [[ -z "${id}" ]] && continue
   # One NetworkID per attached network (usually just "devnet").
-  mapfile -t nids < <(docker inspect -f '{{range .NetworkSettings.Networks}}{{.NetworkID}}{{"\n"}}{{end}}' "${id}" 2>/dev/null || true)
-  for nid in "${nids[@]:-}"; do
+  # Use a while-read loop instead of mapfile for bash 3.2 compatibility (macOS ships bash 3.2).
+  nids=()
+  while IFS= read -r nid; do
+    [[ -n "${nid}" ]] && nids+=("${nid}")
+  done < <(docker inspect -f '{{range .NetworkSettings.Networks}}{{.NetworkID}}{{"\n"}}{{end}}' "${id}" 2>/dev/null || true)
+  [[ ${#nids[@]} -eq 0 ]] && continue
+  for nid in "${nids[@]}"; do
     [[ -z "${nid}" ]] && continue
     if ! docker network inspect "${nid}" >/dev/null 2>&1; then
       name="$(docker inspect -f '{{.Name}}' "${id}" 2>/dev/null | sed 's#^/##')"
