@@ -48,10 +48,13 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /
     && apt-get update && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
-# DNS configuration files for easier CLI usage
-# rndc.conf: allows 'rndc status' without -c flag
-# dns-api-key.conf: allows 'nsupdate -k /etc/dns-api-key.conf' or 'dig -k /etc/dns-api-key.conf'
-COPY .devcontainer/rndc.devcontainer.conf /etc/rndc.conf
+# DNS configuration files for easier CLI usage.
+# Debian bind9utils looks for /etc/bind/rndc.conf (not /etc/rndc.conf).
+# Keep a symlink at /etc/rndc.conf for tools that default there (perf harness).
+# dns-api-key.conf: nsupdate/dig -k /etc/dns-api-key.conf
+RUN mkdir -p /etc/bind
+COPY .devcontainer/rndc.devcontainer.conf /etc/bind/rndc.conf
+RUN ln -sf /etc/bind/rndc.conf /etc/rndc.conf
 COPY .devcontainer/dns-api-key.conf /etc/dns-api-key.conf
 
 # Disable core dumps — Playwright/WebKit crashes otherwise leave multi-GB
