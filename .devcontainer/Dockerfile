@@ -5,11 +5,13 @@ FROM mcr.microsoft.com/devcontainers/go:2.3-trixie
 RUN rm -f /etc/apt/sources.list.d/yarn.list || true
 
 # DNS tools for dig, nsupdate, rndc; psql for the scheduled change store;
-# python3 + pip for pre-commit (hooks are language: system / Go + npm).
+# python3 + pip for pre-commit (hooks are language: system / Go + npm);
+# gh for GitHub CLI (PRs, issues, checks from the container).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bind9-dnsutils \
     bind9-host \
     bind9utils \
+    gh \
     postgresql-client \
     python3 \
     python3-pip \
