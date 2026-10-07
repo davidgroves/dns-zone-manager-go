@@ -19,9 +19,10 @@ Context for AI assistants working on this Go codebase.
 
 ```
 cmd/dns-zone-manager/     # serve entrypoint
-cmd/dns-cli/
+cmd/dns-cli/              # includes auth login (OIDC device code)
 internal/
   httpapi/                # routes, problem+json, auth middleware, SPA
+  auth/                   # api_key + proxy_auth (X-Auth-Request-*) + sessions
   dnsx/                   # Client (TransferBackend), ZoneCache, Notify
   catalog/                # Catalog indexer (AXFR + poll + NOTIFY)
   provision/              # optional rndc addzone/delzone + catalog PTR DDNS
@@ -29,6 +30,7 @@ internal/
   config/                 # Settings, secret_file resolution
   ui/dist/                # embedded SPA (go:embed)
 frontend/                 # Alpine.js SPA source
+.devcontainer/entra/      # Entra emulator fixture (users + app registrations)
 ```
 
 ## Patterns
@@ -43,6 +45,9 @@ frontend/                 # Alpine.js SPA source
 - RNDC: if `settings.RNDC.Enabled`, `provision.New` + `deps.Provisioner`. BIND
   9.20 has no `initial-file`; use `zone_seed.mode: shared_dir`. Avoid typed-nil
   `*provision.Provisioner` on the `httpapi.ZoneProvisioner` interface.
+- Dev OIDC front door: Traefik → oauth2-proxy → Entra emulator; identity
+  arrives as `X-Auth-Request-*` (`proxy_auth`). Falls back to Preferred-Username
+  / User when Email is absent. Direct `:8000` uses API key `dev`.
 
 ## Commands
 

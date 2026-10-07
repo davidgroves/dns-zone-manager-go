@@ -12,7 +12,12 @@ type Proxy struct {
 }
 
 // Authenticate extracts the proxy-authenticated user from request headers.
-// Returns (zero, nil) when proxy auth is disabled or the identity header is absent.
+// Returns (zero, nil) when proxy auth is disabled or no identity header is present.
+//
+// Identity resolution (first non-empty wins for the user id/email):
+//  1. configured user_header (default X-Auth-Request-Email)
+//  2. X-Auth-Request-Preferred-Username (Entra tokens often omit email)
+//  3. X-Auth-Request-User
 func (p *Proxy) Authenticate(r *http.Request) (User, error) {
 	if !p.Settings.Enabled {
 		return User{}, nil
@@ -21,20 +26,26 @@ func (p *Proxy) Authenticate(r *http.Request) (User, error) {
 	if userHeader == "" {
 		userHeader = "X-Auth-Request-Email"
 	}
-	email := r.Header.Get(userHeader)
-	if email == "" {
+	identity := r.Header.Get(userHeader)
+	if identity == "" {
+		identity = r.Header.Get("X-Auth-Request-Preferred-Username")
+	}
+	if identity == "" {
+		identity = r.Header.Get("X-Auth-Request-User")
+	}
+	if identity == "" {
 		return User{}, nil
 	}
-	name := email
+	name := identity
 	if p.Settings.NameHeader != "" {
 		if n := r.Header.Get(p.Settings.NameHeader); n != "" {
 			name = n
 		}
 	}
 	return User{
-		ID:       email,
+		ID:       identity,
 		Name:     name,
-		Email:    email,
+		Email:    identity,
 		AuthType: "proxy",
 		Roles:    []string{"proxy_user"},
 	}, nil

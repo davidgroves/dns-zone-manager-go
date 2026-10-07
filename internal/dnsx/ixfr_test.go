@@ -1,6 +1,7 @@
 package dnsx
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/miekg/dns"
@@ -94,6 +95,49 @@ func TestSerialLessEligibility(t *testing.T) {
 	// wrap: near end of space
 	if !Less(0xffffff00, 10) {
 		t.Fatal("wrapped serial should be less")
+	}
+}
+
+func TestOperationJSONMatchesLivePayload(t *testing.T) {
+	raw, err := json.Marshal(Operation{
+		Action:  "add",
+		Name:    "www.example.com.",
+		Type:    "A",
+		Class:   "IN",
+		TTL:     60,
+		Records: []string{"192.0.2.1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"action", "name", "type", "rdclass", "ttl", "records"} {
+		if _, ok := got[key]; !ok {
+			t.Fatalf("missing %q in %s", key, raw)
+		}
+	}
+}
+
+func TestIXFRMsgCarriesSOANames(t *testing.T) {
+	m := ixfrMsg("example.com.", 100, &dns.SOA{
+		Ns:   "ns1.example.com.",
+		Mbox: "admin.example.com.",
+	})
+	if len(m.Question) != 1 || m.Question[0].Qtype != dns.TypeIXFR {
+		t.Fatalf("question=%v", m.Question)
+	}
+	if len(m.Ns) != 1 {
+		t.Fatalf("authority=%d", len(m.Ns))
+	}
+	soa, ok := m.Ns[0].(*dns.SOA)
+	if !ok {
+		t.Fatalf("authority type %T", m.Ns[0])
+	}
+	if soa.Serial != 100 || soa.Ns != "ns1.example.com." || soa.Mbox != "admin.example.com." {
+		t.Fatalf("soa serial=%d ns=%q mbox=%q", soa.Serial, soa.Ns, soa.Mbox)
 	}
 }
 

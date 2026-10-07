@@ -155,12 +155,14 @@ export function createAuthMethods(_state: AppState) {
     /**
      * Logout and clear state.
      */
-    logout(this: MethodContext) {
+    async logout(this: MethodContext) {
       this.disconnectZoneLive();
-      this.trackLogout();
+      const wasProxyUser = Boolean(this.proxyAuthEnabled && this.currentUser);
+      await this.trackLogout();
       this.authenticated = false;
       this.apiKey = null;
       this.apiKeyInput = '';
+      this.currentUser = null;
       purgeLegacyApiKeyStorage();
       this.zones = [];
       this.selectedZone = null;
@@ -170,10 +172,12 @@ export function createAuthMethods(_state: AppState) {
       this.intendedRoute = null;
       // Clear URL params on logout
       syncUrlFromState(this);
-      // In proxy-auth mode the session is owned by the front proxy
-      // (e.g. oauth2-proxy); redirect there to actually end the session.
-      if (this.proxyAuthEnabled) {
-        window.location.href = '/oauth2/sign_out';
+      // In proxy-auth mode the session is owned by the front proxy / IdP.
+      // Prefer proxyLogoutUrl (IdP front-channel logout → oauth2-proxy
+      // sign_out). Falling back to /oauth2/sign_out alone leaves the IdP
+      // session and silent-SSO will log the user straight back in.
+      if (wasProxyUser) {
+        window.location.href = this.proxyLogoutUrl || '/oauth2/sign_out';
       }
     },
   };

@@ -127,3 +127,33 @@ func TestProxyAuth(t *testing.T) {
 		t.Fatalf("got %+v", u)
 	}
 }
+
+func TestProxyAuthFallsBackToPreferredUsername(t *testing.T) {
+	p := &auth.Proxy{Settings: config.ProxyAuthSettings{
+		Enabled:    true,
+		UserHeader: "X-Auth-Request-Email",
+		NameHeader: "X-Auth-Request-Preferred-Username",
+	}}
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("X-Auth-Request-Preferred-Username", "user1@dns-zone-manager.test")
+	u, err := p.Authenticate(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.ID != "user1@dns-zone-manager.test" || u.Email != "user1@dns-zone-manager.test" || u.AuthType != "proxy" {
+		t.Fatalf("got %+v", u)
+	}
+}
+
+func TestProxyAuthFallsBackToUserHeader(t *testing.T) {
+	p := &auth.Proxy{Settings: config.ProxyAuthSettings{Enabled: true}}
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("X-Auth-Request-User", "oid-guid")
+	u, err := p.Authenticate(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.ID != "oid-guid" || u.AuthType != "proxy" {
+		t.Fatalf("got %+v", u)
+	}
+}

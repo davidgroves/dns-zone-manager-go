@@ -209,25 +209,47 @@ func (c *Client) CheckServerResponding(ctx context.Context) bool {
 
 // QuerySOA returns the SOA serial for zone via UDP.
 func (c *Client) QuerySOA(ctx context.Context, zone string) (uint32, error) {
+	soa, err := c.querySOA(ctx, zone)
+	if err != nil {
+		return 0, err
+	}
+	return soa.Serial, nil
+}
+
+// querySOA fetches the apex SOA. IXFR copies its nameserver and mailbox into
+// the authority section; BIND rejects an SOA with those names empty (FORMERR).
+func (c *Client) querySOA(ctx context.Context, zone string) (*dns.SOA, error) {
 	zone = NormalizeZoneName(zone)
 	m := new(dns.Msg)
 	m.SetQuestion(zone, dns.TypeSOA)
 	client := &dns.Client{Net: "udp", Timeout: c.timeout}
 	resp, _, err := client.ExchangeContext(ctx, m, c.udpAddr)
 	if err != nil {
-		return 0, &DNSClientError{Message: "SOA query failed", Cause: err}
+		return nil, &DNSClientError{Message: "SOA query failed", Cause: err}
 	}
 	if resp.Rcode != dns.RcodeSuccess {
-		return 0, &DNSClientError{
+		return nil, &DNSClientError{
 			Message: fmt.Sprintf("SOA query rcode %s", dns.RcodeToString[resp.Rcode]),
 		}
 	}
 	for _, rr := range resp.Answer {
 		if soa, ok := rr.(*dns.SOA); ok {
-			return soa.Serial, nil
+			return soa, nil
 		}
 	}
-	return 0, &DNSClientError{Message: "SOA query returned no SOA record"}
+	return nil, &DNSClientError{Message: "SOA query returned no SOA record"}
+}
+
+// ixfrMsg builds an IXFR query. The authority SOA keeps the client's serial
+// and the zone SOA's primary nameserver and mailbox.
+func ixfrMsg(zone string, fromSerial uint32, soa *dns.SOA) *dns.Msg {
+	ns, mbox := "", ""
+	if soa != nil {
+		ns, mbox = soa.Ns, soa.Mbox
+	}
+	m := new(dns.Msg)
+	m.SetIxfr(zone, fromSerial, ns, mbox)
+	return m
 }
 
 // PerformAXFR transfers the full zone over TCP with TSIG.
@@ -315,26 +337,27 @@ func (c *Client) PerformIXFR(ctx context.Context, zone string, fromSerial uint32
 		slog.String("server", c.serverIP),
 	)
 
-	// Serial eligibility against live SOA when possible.
-	if fromSerial != 0 {
-		cur, err := c.QuerySOA(ctx, zone)
-		if err == nil {
-			if fromSerial == cur {
-				return IXFRResult{NewSerial: cur}, nil
-			}
-			if !Less(fromSerial, cur) {
-				return IXFRResult{}, &ZoneTransferError{
-					Message: fmt.Sprintf(
-						"IXFR not eligible: from_serial=%d not less than current=%d",
-						fromSerial, cur,
-					),
-				}
+	// Serial eligibility against live SOA when possible. The same SOA supplies
+	// MNAME and RNAME for the IXFR authority section.
+	var soa *dns.SOA
+	if looked, err := c.querySOA(ctx, zone); err == nil {
+		soa = looked
+	}
+	if fromSerial != 0 && soa != nil {
+		if fromSerial == soa.Serial {
+			return IXFRResult{NewSerial: soa.Serial}, nil
+		}
+		if !Less(fromSerial, soa.Serial) {
+			return IXFRResult{}, &ZoneTransferError{
+				Message: fmt.Sprintf(
+					"IXFR not eligible: from_serial=%d not less than current=%d",
+					fromSerial, soa.Serial,
+				),
 			}
 		}
 	}
 
-	m := new(dns.Msg)
-	m.SetIxfr(zone, fromSerial, "", "")
+	m := ixfrMsg(zone, fromSerial, soa)
 	c.attachTSIG(m, c.axfrKeyName, c.axfrAlg)
 
 	trs := &dns.Transfer{

@@ -52,7 +52,7 @@ Sign in using one of the example API keys: `demo-api-key-12345`
 Observability stack (`grafana/otel-lgtm`) scrapes `/metrics` and receives OTLP logs:
 
 - **Grafana**: http://localhost:3000 (open the **DNS Zone Manager** dashboard)
-- **Logs**: Explore → Loki → `{service_name="dns-zone-manager"}`
+- **Logs**: Explore → Loki → `{service_name="dns-zone-manager"}`. Lines are logfmt (`| logfmt | reason="serial_unchanged"`). Indexed labels: `event`, `zone`, `request_method`, `response_outcome`, `response_status_code`.
 - **Metrics**: Explore → Prometheus → `dns_zone_manager_*`
 
 Config lives in `examples/observability/` (collector scrape config + provisioned dashboard).
@@ -109,7 +109,9 @@ docker compose --profile churn up -d --build zone-churn
 docker compose logs -f zone-churn
 ```
 
-API-lane updates use `X-API-Key: demo-api-key-12345`. When webhooks are enabled in the API config, those writes are also recorded as Manual scheduled/audit rows.
+API-lane updates use `X-API-Key: demo-api-key-12345`. Manual writes are
+recorded as Manual scheduled/audit rows whenever the scheduler store is open
+(`autorecord_manual_changes`, default true); that does not require webhooks.
 
 ### Performance harness
 

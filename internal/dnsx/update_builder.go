@@ -8,13 +8,14 @@ import (
 )
 
 // Operation is a single add/delete/replace within a DNS UPDATE.
+// JSON names match the live WebSocket payload the UI applies.
 type Operation struct {
-	Action  string // add | delete | replace
-	Name    string
-	Type    string
-	Class   string
-	TTL     uint32
-	Records []string
+	Action  string   `json:"action"` // add | delete | replace
+	Name    string   `json:"name"`
+	Type    string   `json:"type"`
+	Class   string   `json:"rdclass"`
+	TTL     uint32   `json:"ttl"`
+	Records []string `json:"records"`
 }
 
 // Prerequisite is an explicit RFC 2136 prerequisite.

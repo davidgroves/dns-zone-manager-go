@@ -54,7 +54,7 @@
     {
       "label": "POSTGRES",
       "type": "shell",
-      "command": "proj=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" up -d --no-recreate postgres && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" logs --tail 100 -f postgres",
+      "command": "proj=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" up -d postgres && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" logs --tail 100 -f postgres",
       "group": "build",
       "presentation": {
         "reveal": "always",
@@ -66,7 +66,37 @@
     {
       "label": "LGTM",
       "type": "shell",
-      "command": "proj=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; lgtm=\"${proj}-lgtm-1\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" up -d lgtm && sudo docker exec \"$lgtm\" mkdir -p /otel-lgtm/grafana/conf/provisioning/dashboards/custom && sudo docker cp /workspace/examples/observability/otelcol-config.yaml \"${lgtm}:/otel-lgtm/otelcol-config.yaml\" && sudo docker cp /workspace/examples/observability/dashboards/provisioning.yaml \"${lgtm}:/otel-lgtm/grafana/conf/provisioning/dashboards/custom.yaml\" && sudo docker cp /workspace/examples/observability/dashboards/dns-zone-manager.json \"${lgtm}:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/dns-zone-manager.json\" && sudo docker cp /workspace/examples/observability/dashboards/performance.json \"${lgtm}:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/performance.json\" && sudo docker restart \"$lgtm\" && echo '\\nGrafana: http://localhost:3000  (Loki + metrics dashboards)\\n' && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" logs --tail 100 -f lgtm",
+      "command": "proj=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; lgtm=\"${proj}-lgtm-1\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" up -d lgtm && ver=\"$(sudo docker exec \"$lgtm\" printenv GRAFANA_VERSION)\" && sudo docker exec \"$lgtm\" mkdir -p /otel-lgtm/grafana/conf/provisioning/dashboards/custom && sudo docker cp /workspace/examples/observability/otelcol-config.yaml \"${lgtm}:/otel-lgtm/otelcol-config.yaml\" && sudo docker cp /workspace/examples/observability/dashboards/provisioning.yaml \"${lgtm}:/otel-lgtm/grafana-v${ver}/conf/provisioning/dashboards/custom.yaml\" && sudo docker cp /workspace/examples/observability/dashboards/dns-zone-manager.json \"${lgtm}:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/dns-zone-manager.json\" && sudo docker cp /workspace/examples/observability/dashboards/performance.json \"${lgtm}:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/performance.json\" && sudo docker restart \"$lgtm\" && echo '\\nGrafana: http://localhost:3000  (Loki + metrics dashboards)\\n' && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" logs --tail 100 -f lgtm",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "isBackground": true,
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ENTRA",
+      "type": "shell",
+      "command": "export COMPOSE_PROJECT_NAME=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; if [ -f /tmp/entra-themeproxy/proxy.pid ]; then kill \"$(cat /tmp/entra-themeproxy/proxy.pid)\" 2>/dev/null || true; fi; fuser -k 8444/tcp 2>/dev/null || true; rm -rf /tmp/entra-themeproxy && mkdir -p /tmp/entra-themeproxy && go build -o /tmp/entra-themeproxy/proxy ./.devcontainer/entra/themeproxy && /tmp/entra-themeproxy/proxy > /tmp/entra-themeproxy/proxy.log 2>&1 & echo $! > /tmp/entra-themeproxy/proxy.pid && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$COMPOSE_PROJECT_NAME\" up -d --force-recreate entra && echo 'Waiting for Entra emulator (via dark theme proxy on :8444)…' && until curl -sf http://127.0.0.1:8444/health >/dev/null; do sleep 1; done && curl -sf -X POST http://127.0.0.1:8444/admin/api/import -H 'Content-Type: application/json' --data-binary @.devcontainer/entra/directory.json && echo && echo 'Entra emulator:  http://localhost:8444  (dark sign-in via themeproxy → :18445)' && echo 'Issuer:           http://localhost:8444/6f89cf12-978b-4d23-ac18-9ef0c127cf87/v2.0' && echo 'Dummy users:      user1@dns-zone-manager.test / pass1  (user2/pass2, user3/pass3)' && echo && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$COMPOSE_PROJECT_NAME\" logs --tail 100 -f entra",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "isBackground": true,
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "TRAEFIK",
+      "type": "shell",
+      "command": "export COMPOSE_PROJECT_NAME=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; until curl -sf http://127.0.0.1:8444/health >/dev/null 2>&1; do echo 'Waiting for Entra emulator (start the ENTRA task if it is not running)...'; sleep 2; done && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$COMPOSE_PROJECT_NAME\" create oauth2-proxy >/dev/null && VOL=\"${COMPOSE_PROJECT_NAME}_oauth2-templates\" && SEED=$(sudo docker create -v \"$VOL:/templates\" alpine:3.20) && sudo docker cp .devcontainer/oauth2-proxy/sign_in.html \"$SEED:/templates/sign_in.html\" && sudo docker cp .devcontainer/oauth2-proxy/error.html \"$SEED:/templates/error.html\" && sudo docker cp .devcontainer/oauth2-proxy/robots.txt \"$SEED:/templates/robots.txt\" && sudo docker rm \"$SEED\" >/dev/null && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$COMPOSE_PROJECT_NAME\" up -d --force-recreate oauth2-proxy traefik && echo && echo 'App (OIDC):       http://localhost:8080' && echo 'Traefik dashboard: http://localhost:8081' && echo 'dns-cli auth login --url http://localhost:8080' && echo '  (user1@dns-zone-manager.test / pass1)' && echo && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$COMPOSE_PROJECT_NAME\" logs --tail 100 -f traefik oauth2-proxy",
       "group": "build",
       "presentation": {
         "reveal": "always",
@@ -81,7 +111,7 @@
     {
       "label": "ZONE CHURN",
       "type": "shell",
-      "command": "BIND_HOST=bind BIND_PORT=15353 API_BASE=http://127.0.0.1:8000 API_KEY= INTERVAL_SEC=5 /workspace/examples/always-changing/churn.sh",
+      "command": "BIND_HOST=bind BIND_PORT=15353 API_BASE=http://127.0.0.1:8000 API_KEY=dev INTERVAL_SEC=5 /workspace/examples/always-changing/churn.sh",
       "group": "build",
       "presentation": {
         "reveal": "always",
@@ -96,7 +126,7 @@
     {
       "label": "PERF: Create 5M zone",
       "type": "shell",
-      "command": "API_BASE=http://127.0.0.1:8000 BIND_HOST=bind BIND_PORT=15353 ./perf.sh zone create --preset 5m",
+      "command": "API_BASE=http://127.0.0.1:8000 API_KEY=dev BIND_HOST=bind BIND_PORT=15353 ./perf.sh zone create --preset 5m",
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -107,7 +137,7 @@
     {
       "label": "PERF: Run all",
       "type": "shell",
-      "command": "API_BASE=http://127.0.0.1:8000 BIND_HOST=bind BIND_PORT=15353 ./perf.sh run all",
+      "command": "API_BASE=http://127.0.0.1:8000 API_KEY=dev BIND_HOST=bind BIND_PORT=15353 ./perf.sh run all",
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -118,7 +148,7 @@
     {
       "label": "PERF: Destroy zone",
       "type": "shell",
-      "command": "API_BASE=http://127.0.0.1:8000 BIND_HOST=bind BIND_PORT=15353 ./perf.sh zone destroy --delete-file",
+      "command": "API_BASE=http://127.0.0.1:8000 API_KEY=dev BIND_HOST=bind BIND_PORT=15353 ./perf.sh zone destroy --delete-file",
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -138,7 +168,7 @@
     },
     {
       "label": "Run All (Complete)",
-      "dependsOn": ["BACKEND", "BIND", "POSTGRES", "ZONE CHURN", "LGTM"],
+      "dependsOn": ["BACKEND", "BIND", "POSTGRES", "ZONE CHURN", "LGTM", "ENTRA", "TRAEFIK"],
       "dependsOrder": "parallel",
       "group": "build",
       "problemMatcher": []

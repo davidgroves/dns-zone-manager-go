@@ -19,13 +19,16 @@ type apiClient struct {
 }
 
 func newAPIClient(opts *cliOptions) (*apiClient, error) {
-	if strings.TrimSpace(opts.apiKey) == "" {
-		return nil, fmt.Errorf("API key required. Set DNS_API_KEY or use --api-key")
-	}
 	base := strings.TrimRight(opts.baseURL, "/")
 	baseURL, err := url.Parse(base)
 	if err != nil {
 		return nil, fmt.Errorf("invalid --url: %w", err)
+	}
+	// Resolve credentials early so callers get a clear error before the first request.
+	if strings.TrimSpace(opts.apiKey) == "" && strings.TrimSpace(opts.token) == "" {
+		if _, err := resolveBearerToken(opts, false); err != nil {
+			return nil, err
+		}
 	}
 	return &apiClient{
 		opts:    opts,
@@ -79,7 +82,20 @@ func (c *apiClient) do(method, path string, query url.Values, body any, contentT
 	if err != nil {
 		return nil, nil, err
 	}
-	req.Header.Set("X-API-Key", c.opts.apiKey)
+	if key := strings.TrimSpace(c.opts.apiKey); key != "" {
+		req.Header.Set("X-API-Key", key)
+	}
+	bearer := strings.TrimSpace(c.opts.token)
+	if bearer == "" {
+		if t, err := resolveBearerToken(c.opts, true); err == nil {
+			bearer = t
+		} else if key := strings.TrimSpace(c.opts.apiKey); key == "" {
+			return nil, nil, err
+		}
+	}
+	if bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+bearer)
+	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	} else if body != nil {

@@ -110,6 +110,27 @@ func TestZoneSearch(t *testing.T) {
 	}
 }
 
+func TestAddRecordsDedupesIdenticalRdata(t *testing.T) {
+	z := NewZone("example.com.")
+	_ = z.SetFromAXFR(sampleZoneRRs(t))
+
+	// Optimistic DDNS cache update + later IXFR add of the same RR must not
+	// leave duplicate rdata in the in-memory RRset (BIND itself won't).
+	if err := z.AddRecords("api", dns.TypeA, dns.ClassINET, 60, []string{"192.0.2.9"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := z.AddRecords("api", dns.TypeA, dns.ClassINET, 60, []string{"192.0.2.9", "192.0.2.10"}); err != nil {
+		t.Fatal(err)
+	}
+	info, ok := z.GetRRset("api", dns.TypeA)
+	if !ok || len(info.Records) != 2 {
+		t.Fatalf("records=%v ok=%v, want unique [192.0.2.9 192.0.2.10]", info, ok)
+	}
+	if info.Records[0] != "192.0.2.9" || info.Records[1] != "192.0.2.10" {
+		t.Fatalf("records=%v", info.Records)
+	}
+}
+
 func TestZoneMutations(t *testing.T) {
 	z := NewZone("example.com.")
 	_ = z.SetFromAXFR(sampleZoneRRs(t))

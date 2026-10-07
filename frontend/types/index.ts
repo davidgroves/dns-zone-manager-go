@@ -391,6 +391,7 @@ export interface AppState {
   loginError: string;
   apiKeyEnabled: boolean;
   proxyAuthEnabled: boolean;
+  proxyLogoutUrl: string | null;
   currentUser: string | null;
   appVersion: string;
 
@@ -578,6 +579,7 @@ export interface ThemeConfig {
 export interface AppConfig {
   apiKeyEnabled?: boolean;
   proxyAuthEnabled?: boolean;
+  proxyLogoutUrl?: string | null;
   version?: string;
   theme?: ThemeConfig;
 }

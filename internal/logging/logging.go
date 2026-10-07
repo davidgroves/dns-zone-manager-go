@@ -91,10 +91,13 @@ func newOTLPHandler(endpoint string, lvl slog.Level) (slog.Handler, error) {
 		serviceName = "dns-zone-manager"
 	}
 
+	// resource.Default() carries the SDK's schema URL. Pairing it with an
+	// older semconv schema URL makes Merge fail ("conflicting Schema URL")
+	// and Configure then disables OTLP entirely. Schemaless attributes merge
+	// cleanly and still set service.name for Loki.
 	res, err := resource.Merge(
 		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
+		resource.NewSchemaless(
 			semconv.ServiceName(serviceName),
 			semconv.ServiceNamespace("dns-zone-manager"),
 			semconv.ServiceVersion(version.Current()),

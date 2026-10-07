@@ -15,7 +15,9 @@ import (
 	"github.com/davidgroves/dns-zone-manager-go/internal/store"
 )
 
-// EventEmitter records applied DNS changes and enqueues webhook outbox rows.
+// EventEmitter records manual DNS changes in the scheduler store and, when
+// webhooks are enabled, enqueues outbox rows. Autorecord does not require
+// Settings.Enabled — only a non-nil Store and AutorecordManualChanges.
 // It implements dnsx.ChangeHooks when wired as Client.Hooks.
 type EventEmitter struct {
 	Store    *store.Store
@@ -26,7 +28,10 @@ type EventEmitter struct {
 
 // OnUpdateResult implements dnsx.ChangeHooks.
 func (e *EventEmitter) OnUpdateResult(ctx context.Context, zone string, msg *dns.Msg, resp *dns.Msg, err error) {
-	if e == nil || !e.Settings.Enabled {
+	if e == nil || e.Store == nil {
+		return
+	}
+	if !e.Settings.Enabled && !e.Settings.AutorecordManualChanges {
 		return
 	}
 	if err != nil {
@@ -46,18 +51,24 @@ func (e *EventEmitter) OnUpdateResult(ctx context.Context, zone string, msg *dns
 }
 
 // EmitApplied builds a change_applied event, optionally autorecords it, and
-// enqueues outbox rows for matching targets — all in one store transaction.
+// enqueues outbox rows for matching targets when webhooks are enabled.
 func (e *EventEmitter) EmitApplied(ctx context.Context, zone string, msg *dns.Msg, rcode string) error {
 	return e.emit(ctx, zone, msg, EventChangeApplied, rcode, "")
 }
 
-// EmitFailed builds a change_failed event and enqueues matching targets.
+// EmitFailed builds a change_failed event and enqueues matching targets when
+// webhooks are enabled.
 func (e *EventEmitter) EmitFailed(ctx context.Context, zone string, msg *dns.Msg, rcode, errMsg string) error {
 	return e.emit(ctx, zone, msg, EventChangeFailed, rcode, errMsg)
 }
 
 func (e *EventEmitter) emit(ctx context.Context, zone string, msg *dns.Msg, eventType, rcode, errMsg string) error {
-	if e == nil || e.Store == nil || !e.Settings.Enabled {
+	if e == nil || e.Store == nil {
+		return nil
+	}
+	wantAutorecord := e.Settings.AutorecordManualChanges
+	wantNotify := e.Settings.Enabled
+	if !wantAutorecord && !wantNotify {
 		return nil
 	}
 	if !stringsHasSuffixDot(zone) {
@@ -114,11 +125,14 @@ func (e *EventEmitter) emit(ctx context.Context, zone string, msg *dns.Msg, even
 		Autorecord: mintedID,
 	}
 
-	targets := MatchingTargets(e.Settings, eventType, zone)
+	var targets []config.WebhookTarget
+	if wantNotify {
+		targets = MatchingTargets(e.Settings, eventType, zone)
+	}
 
 	err := e.Store.RunInTx(ctx, "emit_change_event", func(ctx context.Context) error {
 		if ev.Autorecord {
-			if !e.Settings.AutorecordManualChanges {
+			if !wantAutorecord {
 				metrics.IncWebhookAutorecordedChanges("skipped")
 				ev.ChangeID = nil
 				ev.Autorecord = false
@@ -177,6 +191,9 @@ func (e *EventEmitter) emit(ctx context.Context, zone string, msg *dns.Msg, even
 			}
 		}
 
+		if !wantNotify {
+			return nil
+		}
 		body, err := json.Marshal(ev)
 		if err != nil {
 			return err

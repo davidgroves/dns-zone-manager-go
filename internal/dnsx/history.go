@@ -221,29 +221,29 @@ func (c *Client) GetZoneHistory(ctx context.Context, zone string, fromSerial uin
 		slog.Uint64("from_serial", uint64(fromSerial)),
 	)
 
-	if fromSerial != 0 {
-		cur, err := c.QuerySOA(ctx, zone)
-		if err == nil {
-			if fromSerial == cur {
-				return ZoneHistory{
-					Zone:                zone,
-					CurrentSerial:       cur,
-					AvailableFromSerial: fromSerial,
-				}, nil
-			}
-			if !Less(fromSerial, cur) {
-				return ZoneHistory{}, &ZoneTransferError{
-					Message: fmt.Sprintf(
-						"IXFR not eligible: from_serial=%d not less than current=%d",
-						fromSerial, cur,
-					),
-				}
+	var soa *dns.SOA
+	if looked, err := c.querySOA(ctx, zone); err == nil {
+		soa = looked
+	}
+	if fromSerial != 0 && soa != nil {
+		if fromSerial == soa.Serial {
+			return ZoneHistory{
+				Zone:                zone,
+				CurrentSerial:       soa.Serial,
+				AvailableFromSerial: fromSerial,
+			}, nil
+		}
+		if !Less(fromSerial, soa.Serial) {
+			return ZoneHistory{}, &ZoneTransferError{
+				Message: fmt.Sprintf(
+					"IXFR not eligible: from_serial=%d not less than current=%d",
+					fromSerial, soa.Serial,
+				),
 			}
 		}
 	}
 
-	m := new(dns.Msg)
-	m.SetIxfr(zone, fromSerial, "", "")
+	m := ixfrMsg(zone, fromSerial, soa)
 	c.attachTSIG(m, c.axfrKeyName, c.axfrAlg)
 
 	trs := &dns.Transfer{

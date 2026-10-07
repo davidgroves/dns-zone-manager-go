@@ -122,4 +122,4 @@ require (
 	modernc.org/memory v1.12.1 // indirect
 )
 
-replace github.com/miekg/dns => github.com/davidgroves/dns v0.0.0-20261001145626-537ba7e9fbb7
+replace github.com/miekg/dns => github.com/davidgroves/dns v0.0.0-20261007184422-03be1a43192e

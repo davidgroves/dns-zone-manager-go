@@ -1,15 +1,21 @@
 # DNS Zone Manager Devcontainer Environment
-# Provides a development container, a BIND DNS server, PostgreSQL, and
-# Grafana LGTM (Loki + Grafana + Tempo + Prometheus) for logs and metrics.
+# Provides a development container, a BIND DNS server, PostgreSQL,
+# Grafana LGTM (Loki + Grafana + Tempo + Prometheus), and an optional
+# Traefik + oauth2-proxy + Entra-emulator auth front door.
 #
 # No static IPs/subnet are used. BIND's also-notify directive requires an IP
 # address (it does not support hostnames), so the BIND entrypoint resolves the
 # "dev" service name to its current IP at runtime and enables NOTIFY via
 # `rndc reconfig`. The dev container reaches BIND via the "bind" service name.
-#   dev:      receives NOTIFY on port 15354
+#   dev:      receives NOTIFY on port 15354; also publishes Traefik/Entra ports
 #   bind:     DNS on 15353, RNDC on 953
 #   postgres: scheduled change store on 5432 (also published on host 15432)
 #   lgtm:     Grafana on 3000, OTLP on 4317/4318
+#   entra / oauth2-proxy / traefik:
+#     share the `dev` container's network namespace so the OIDC issuer
+#     http://localhost:8444/... is the same URL for the host browser, dns-cli
+#     inside the container, and oauth2-proxy. Start them via the ENTRA /
+#     TRAEFIK VS Code tasks (not runServices).
 
 services:
   # Development container - VS Code/Cursor connects here
@@ -32,10 +38,15 @@ services:
       # Ship structured logs to Loki via the LGTM OTLP collector
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4318
       - OTEL_SERVICE_NAME=dns-zone-manager
-    # Expose ports directly (more reliable than VS Code forwardPorts on macOS)
+    # Expose ports directly (more reliable than VS Code forwardPorts on macOS).
+    # 8080/8081/8444 are bound by Traefik / the Entra emulator when those
+    # tasks are running; they share this container's network namespace.
     ports:
       - "8000:8000"   # API and embedded web UI
       - "5173:5173"   # optional Vite dev server (not started by default)
+      - "8080:8080"   # Traefik (OIDC front door)
+      - "8081:8081"   # Traefik dashboard
+      - "8444:8444"   # Entra ID emulator (OIDC issuer)
     # Enable host.docker.internal on Linux (automatic on Docker Desktop)
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -46,6 +57,104 @@ services:
       - seccomp:unconfined
     networks:
       - devnet
+
+  # Local Microsoft Entra ID emulator (OIDC issuer for the Traefik front door).
+  # Shares the `dev` network namespace so issuer URLs are always localhost:8444.
+  # Listens on internal :18445; the ENTRA task runs themeproxy on :8444 to
+  # darken the baked-in light sign-in HTML (emulator has no theme flag).
+  # PUBLIC_ORIGIN stays :8444 so discovery / redirects match the browser URL.
+  # The ENTRA task imports .devcontainer/entra/directory.json after health.
+  entra:
+    image: ghcr.io/calvinchengx/entra-emulator@sha256:19418a503b6459d1f9db4e0d7657f78bf01655269ce7abef968fd5d1eb80da86
+    network_mode: "container:${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}-dev-1"
+    environment:
+      - TZ=UTC
+      - TLS_ENABLED=false
+      - PORT=18445
+      - HOST=0.0.0.0
+      - ORIGIN_MODE=compat
+      - PUBLIC_ORIGIN=http://localhost:8444
+      - REQUIRE_PASSWORD=true
+      # Empty data dir = in-memory store (ephemeral, like BIND/Postgres tmpfs).
+      - ENTRA_DATA_DIR=
+      - TOKEN_LIFETIME_ACCESS_SECONDS=3600
+      - DEVICE_CODE_INTERVAL_SECONDS=5
+    restart: unless-stopped
+
+  # oauth2-proxy sits between Traefik and the API. Browser sessions use the
+  # authorization-code flow against the Entra emulator; CLI Bearer JWTs are
+  # validated via --skip-jwt-bearer-tokens. Identity is forwarded as
+  # X-Auth-Request-* headers that the API's proxy_auth trusts.
+  #
+  # Production: change PROVIDER to entra-id and point OIDC_ISSUER_URL at a
+  # real tenant (entra-id additionally asserts the login.microsoftonline.com
+  # issuer template, which the emulator cannot satisfy).
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.9.0
+    network_mode: "container:${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}-dev-1"
+    env_file:
+      - entra/dev.env
+    environment:
+      - TZ=UTC
+      - OAUTH2_PROXY_PROVIDER=oidc
+      - OAUTH2_PROXY_OIDC_ISSUER_URL=http://localhost:8444/6f89cf12-978b-4d23-ac18-9ef0c127cf87/v2.0
+      - OAUTH2_PROXY_CLIENT_ID=c9c2fd4f-4c1e-44a3-9cd5-a1a1191fe9a3
+      - OAUTH2_PROXY_CLIENT_SECRET=eZYgMLyK3PnDubc1UXOs8TTh8K1hLE6DMejZFjJfFvc
+      - OAUTH2_PROXY_REDIRECT_URL=http://localhost:8080/oauth2/callback
+      - OAUTH2_PROXY_HTTP_ADDRESS=0.0.0.0:4180
+      - OAUTH2_PROXY_UPSTREAMS=static://202
+      - OAUTH2_PROXY_EMAIL_DOMAINS=*
+      - OAUTH2_PROXY_COOKIE_SECURE=false
+      - OAUTH2_PROXY_COOKIE_HTTPONLY=true
+      - OAUTH2_PROXY_SET_XAUTHREQUEST=true
+      - OAUTH2_PROXY_REVERSE_PROXY=true
+      # Show oauth2-proxy's "Sign in with Entra ID" page before redirecting to
+      # the IdP. With ForwardAuth pointed at `/` (static://202), an unauthenticated
+      # visit returns that HTML (403) instead of bouncing straight to :8444.
+      - OAUTH2_PROXY_SKIP_PROVIDER_BUTTON=false
+      - OAUTH2_PROXY_PROVIDER_DISPLAY_NAME=Entra ID
+      # Dark-themed templates (see .devcontainer/oauth2-proxy/). "-" hides the
+      # default light SVG logo which does not suit the dark page.
+      - OAUTH2_PROXY_CUSTOM_TEMPLATES_DIR=/templates
+      - OAUTH2_PROXY_CUSTOM_SIGN_IN_LOGO=-
+      # id_tokens expose preferred_username (UPN); access tokens get it via
+      # optionalClaims on the API app. Plain "email" / "upn" are not always present.
+      - OAUTH2_PROXY_OIDC_EMAIL_CLAIM=preferred_username
+      - OAUTH2_PROXY_OIDC_GROUPS_CLAIM=groups
+      - OAUTH2_PROXY_USER_ID_CLAIM=oid
+      - OAUTH2_PROXY_SCOPE=openid profile email offline_access
+      - OAUTH2_PROXY_WHITELIST_DOMAINS=localhost:8080
+      # After clearing the oauth2-proxy cookie, also end the Entra session so
+      # the next visit does not silent-SSO the user straight back in.
+      - OAUTH2_PROXY_BACKEND_LOGOUT_URL=http://localhost:8444/6f89cf12-978b-4d23-ac18-9ef0c127cf87/oauth2/v2.0/logout?post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A8080%2F
+      - OAUTH2_PROXY_SKIP_JWT_BEARER_TOKENS=true
+      - OAUTH2_PROXY_EXTRA_JWT_ISSUERS=http://localhost:8444/6f89cf12-978b-4d23-ac18-9ef0c127cf87/v2.0=api://dns-zone-manager
+      - OAUTH2_PROXY_API_ROUTES=^/v1/
+      - OAUTH2_PROXY_SKIP_AUTH_ROUTES=GET=^/(health|ready|metrics)$
+      - OAUTH2_PROXY_BEARER_TOKEN_LOGIN_FALLBACK=false
+    # Dark templates are copied into this volume by the TRAEFIK task (same
+    # nested-docker constraint as BIND/LGTM: host-path binds resolve on the
+    # Docker daemon host, not the workspace inside `dev`).
+    volumes:
+      - oauth2-templates:/templates:ro
+    restart: unless-stopped
+
+  # Traefik reverse proxy: /oauth2 -> oauth2-proxy, everything else -> API
+  # with ForwardAuth. Shares the `dev` network namespace (see entra above).
+  traefik:
+    image: traefik:v3.5
+    network_mode: "container:${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}-dev-1"
+    command:
+      - --entrypoints.web.address=:8080
+      - --entrypoints.traefik.address=:8081
+      - --api.insecure=true
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --accesslog=true
+      - --log.level=INFO
+    configs:
+      - source: traefik_dynamic
+        target: /etc/traefik/dynamic.yml
+    restart: unless-stopped
 
   # BIND DNS Server
   # Pin to the 9.20 STABLE branch (even minor = stable, odd minor = development).
@@ -178,7 +287,7 @@ services:
       - BIND_HOST=bind
       - BIND_PORT=15353
       - API_BASE=http://dev:8000
-      - API_KEY=
+      - API_KEY=dev
       - INTERVAL_SEC=5
       - TSIG_NAME=dns-api-key
       - TSIG_SECRET=K8vC2mP9nQ4rT6wX1yB3fG5hJ7kL0mN2pR4sU6vW8xY=
@@ -227,4 +336,45 @@ volumes:
   lgtm-data:
   perf-zones:
   managed-zones:
+  oauth2-templates:
+
+# Inline Traefik file-provider config. Compose copies this into the Traefik
+# container (same reason BIND/LGTM avoid host-path bind mounts from inside
+# the dev container). ForwardAuth targets localhost because Traefik shares
+# the `dev` network namespace with oauth2-proxy and the API process.
+configs:
+  traefik_dynamic:
+    content: |
+      http:
+        routers:
+          oauth2:
+            rule: PathPrefix(`/oauth2`)
+            entryPoints: [web]
+            priority: 100
+            service: oauth2-proxy
+          app:
+            rule: PathPrefix(`/`)
+            entryPoints: [web]
+            priority: 1
+            middlewares: [oauth2-auth]
+            service: backend
+        services:
+          oauth2-proxy:
+            loadBalancer:
+              servers:
+                - url: http://127.0.0.1:4180
+          backend:
+            loadBalancer:
+              servers:
+                - url: http://127.0.0.1:8000
+        middlewares:
+          oauth2-auth:
+            forwardAuth:
+              address: http://127.0.0.1:4180/
+              trustForwardHeader: true
+              authResponseHeaders:
+                - X-Auth-Request-User
+                - X-Auth-Request-Email
+                - X-Auth-Request-Preferred-Username
+                - X-Auth-Request-Groups
 

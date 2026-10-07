@@ -408,6 +408,7 @@ export function createApp(config: AppConfig) {
           const uiConfig = await response.json();
           self.apiKeyEnabled = uiConfig.apiKeyEnabled ?? true;
           self.proxyAuthEnabled = uiConfig.proxyAuthEnabled ?? false;
+          self.proxyLogoutUrl = uiConfig.proxyLogoutUrl ?? null;
           self.currentUser = uiConfig.user?.email ?? null;
           self.appVersion = uiConfig.version ?? '';
           self.applyThemeFromConfig(uiConfig.theme);
@@ -419,8 +420,10 @@ export function createApp(config: AppConfig) {
 
       // Trusted reverse-proxy auth: a front proxy (e.g. Traefik + oauth2-proxy)
       // already authenticated the user and injects the identity header on every
-      // request. Skip the login screen entirely.
-      if (self.proxyAuthEnabled) {
+      // request. Only skip the login screen when /ui/config actually reports a
+      // proxy user — otherwise fall through so :8000 (API key / session) still
+      // works when proxy_auth is enabled but no proxy is in front.
+      if (self.proxyAuthEnabled && self.currentUser) {
         self.authenticated = true;
         self.trackLogin('proxy');
         if (self.intendedRoute) {

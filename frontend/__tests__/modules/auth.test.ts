@@ -71,7 +71,7 @@ describe('auth storage', () => {
     };
     localStorage.setItem('dns_zone_manager_api_key', 'k');
     sessionStorage.setItem('dns_zone_manager_api_key', 'k');
-    methods.logout.call(ctx as never);
+    await methods.logout.call(ctx as never);
     expect(ctx.apiKey).toBeNull();
     expect(ctx.apiKeyInput).toBe('');
     expect(localStorage.getItem('dns_zone_manager_api_key')).toBeNull();

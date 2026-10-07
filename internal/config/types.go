@@ -85,6 +85,10 @@ type ProxyAuthSettings struct {
 	Enabled    bool   `mapstructure:"enabled" yaml:"enabled"`
 	UserHeader string `mapstructure:"user_header" yaml:"user_header"`
 	NameHeader string `mapstructure:"name_header" yaml:"name_header"`
+	// LogoutURL is the IdP front-channel logout URL the SPA redirects to
+	// (e.g. Entra end_session). Must clear the IdP browser session; oauth2-proxy
+	// /oauth2/sign_out alone is not enough when the IdP can silent-SSO.
+	LogoutURL string `mapstructure:"logout_url" yaml:"logout_url"`
 }
 
 type CacheSettings struct {

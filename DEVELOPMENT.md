@@ -3,12 +3,14 @@
 Work on this tree **inside the Dev Container**. The workspace is
 `.devcontainer/`: a Compose project with the `dev` service (Go, Node, DNS
 tools, Docker socket), sibling **BIND** (`bind:15353`), **PostgreSQL**
-(tmpfs; schema is created when the API starts), and optional **LGTM**
-(Grafana / Loki / Prometheus / Tempo).
+(tmpfs; schema is created when the API starts), optional **LGTM**
+(Grafana / Loki / Prometheus / Tempo), and an optional **Traefik +
+oauth2-proxy + Entra emulator** OIDC front door.
 
 In Cursor or VS Code: clone the repo, install the Dev Containers extension,
 then **Reopen in Container**. First create runs `npm install`, `go mod
-download`, and pre-commit. Auth is off in this config (anonymous admin).
+download`, and pre-commit. Auth is on: API key `dev` on `:8000`, OIDC via
+Traefik on `:8080` when the ENTRA/TRAEFIK tasks are running.
 
 ## The dev image is prebuilt (pulled, not built)
 
@@ -42,15 +44,48 @@ The API does **not** start with the container. Use **Tasks** after attach:
   Task**). Starts **BACKEND**, **BIND** log follow, and **POSTGRES** log
   follow. BACKEND builds the SPA into `dist/` then
   `go run … serve --config .devcontainer/config.devcontainer.yaml --ui-dir dist`.
-- **Run All (Complete)** — the same, plus **ZONE CHURN** (DDNS against
-  `always-changing.example`) and **LGTM** (`docker compose up` Grafana).
+- **Run All (Complete)** — the same, plus **ZONE CHURN**, **LGTM**, **ENTRA**
+  (local Entra ID emulator), and **TRAEFIK** (oauth2-proxy + Traefik).
 
-Open **http://localhost:8000** for the API and the UI the binary is serving.
-With Complete, Grafana is **http://localhost:3000**. Stop tasks with
-**Terminal: Kill All Terminals**.
+Open **http://localhost:8000** for the API and the UI (API key `dev`). With
+Complete, Grafana is **http://localhost:3000** and the OIDC front door is
+**http://localhost:8080**. Stop tasks with **Terminal: Kill All Terminals**.
 
 BIND and Postgres are already Compose services; those tasks mainly attach to
 logs. BACKEND is the process you restart after Go changes.
+
+## OIDC front door (Traefik + Entra emulator)
+
+Mirrors a production Traefik → oauth2-proxy → Entra ID deployment. The local
+IdP is [entra-emulator](https://github.com/calvinchengx/entra-emulator); the
+fixture in [`.devcontainer/entra/`](.devcontainer/entra/) seeds users and apps.
+
+| URL | What |
+|---|---|
+| http://localhost:8000 | API + SPA (API key `dev` / `demo-api-key-12345`) |
+| http://localhost:8080 | Same app via Traefik (OIDC: “Sign in with Entra ID” then IdP) |
+| http://localhost:8081 | Traefik dashboard |
+| http://localhost:8444 | Entra emulator (OIDC issuer; dark sign-in via themeproxy) |
+
+Dummy users: `user1@dns-zone-manager.test` / `pass1` (also user2/pass2, user3/pass3).
+
+```bash
+# After ENTRA + TRAEFIK + BACKEND are up:
+dns-cli auth login --url http://localhost:8080
+# open the printed verification URL, approve as user1 / pass1
+dns-cli --url http://localhost:8080 list zones
+dns-cli auth status
+```
+
+`entra`, `oauth2-proxy`, and `traefik` share the `dev` container’s network
+namespace so the issuer `http://localhost:8444/...` is the same URL for the
+host browser, `dns-cli`, and oauth2-proxy. Publishing those ports on `dev`
+requires a **one-time Rebuild Container** after pulling this change.
+
+To point the same stack at real Entra ID later: set oauth2-proxy
+`OAUTH2_PROXY_PROVIDER=entra-id` and a real issuer/client secret, and run
+`dns-cli auth login --issuer https://login.microsoftonline.com/<tenant>/v2.0
+--client-id <app> --scope 'api://…/access_as_user offline_access'`.
 
 ## Frontend live reload (Vite)
 
@@ -85,18 +120,16 @@ Config: `.pre-commit-config.yaml` (Go/npm system hooks) and `.golangci.yml` (v2)
 
 `go.mod` replaces `github.com/miekg/dns` with
 [davidgroves/dns](https://github.com/davidgroves/dns) branch
-`fix/tcp-tsig-response-mac` (commit `537ba7e9`).
+`fix/tcp-tsig-response-mac` (commit `03be1a43`).
 
-miekg v1.1.63 does not chain the TSIG MAC across messages on one TCP
-connection. BIND requires that chain, so the second signed update on a
-pooled connection was `BADSIG`. The pool treated that as a broken socket
-and closed it, so each connection carried one successful DDNS update and
-then one failure. The retry of the failed update had already had its TSIG
-record removed by signing, so it was sent unsigned and BIND refused it.
-Half of a sustained run failed.
+miekg `Conn.WriteMsg` feeds the previous message's MAC into the next
+signature. BIND treats each UPDATE on a kept-open TCP connection as a new
+transaction and verifies it with an empty prior MAC, so the second update
+on a pooled connection was `BADSIG`. The fork signs each request with an
+empty prior MAC. Multi-message answers still chain inside `Transfer`.
 
-Drop the `replace` once the fix is in an upstream release and this module
-requires that version.
+Drop the `replace` once that behavior is in an upstream release and this
+module requires that version.
 
 ## Migrations
 

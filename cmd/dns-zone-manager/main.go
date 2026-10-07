@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -118,18 +119,21 @@ func runServe(configPath, host string, port int, uiDir string) error {
 		defer func() { _ = st.Close() }()
 	}
 
-	if settings.Webhooks.Enabled {
+	// Wire change hooks whenever the store is open so manual DDNS edits are
+	// autorecorded into the audit log. Webhook delivery stays gated on
+	// settings.Webhooks.Enabled inside the emitter / outbox worker.
+	if st != nil || settings.Webhooks.Enabled {
 		emitter = &notifications.EventEmitter{
 			Store:    st,
 			Settings: settings.Webhooks,
 			Server:   settings.DNS.Server,
 		}
 		client.Hooks = emitter
-		if st != nil {
-			outbox = notifications.NewOutboxWorker(st, settings.Webhooks)
-			outbox.Start(ctx)
-			defer outbox.Stop()
-		}
+	}
+	if settings.Webhooks.Enabled && st != nil {
+		outbox = notifications.NewOutboxWorker(st, settings.Webhooks)
+		outbox.Start(ctx)
+		defer outbox.Stop()
 	}
 
 	var notifyListener *dnsx.NotifyListener
@@ -249,8 +253,30 @@ func runServe(configPath, host string, port int, uiDir string) error {
 		if errors.Is(err, http.ErrServerClosed) {
 			return nil
 		}
-		return err
+		if isAddrInUse(err) {
+			msg := fmt.Sprintf("cannot bind to %s: address already in use (stop the other process using this port, then retry)", addr)
+			logging.LogInternalEvent(log, "http_listen_failed", slog.LevelError,
+				slog.String("addr", addr),
+				slog.String("error", msg),
+			)
+			return errors.New(msg)
+		}
+		return fmt.Errorf("HTTP listen on %s failed: %w", addr, err)
 	}
+}
+
+func isAddrInUse(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, syscall.EADDRINUSE) {
+		return true
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return errors.Is(opErr.Err, syscall.EADDRINUSE)
+	}
+	return false
 }
 
 func runCatalogSync(ctx context.Context, idx *catalog.Indexer, cache *dnsx.ZoneCache, settings *config.Settings) {

@@ -1,0 +1,240 @@
+{{define "sign_in.html"}}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="color-scheme" content="dark">
+    <title>Sign In</title>
+    <style>
+      :root {
+        --bg-primary: #0f1419;
+        --bg-secondary: #1a1f2e;
+        --bg-tertiary: #252b3b;
+        --border-color: #3d4556;
+        --text-primary: #e6edf3;
+        --text-secondary: #8b949e;
+        --text-muted: #6e7681;
+        --accent-primary: #58a6ff;
+        --accent-primary-hover: #4b8fdb;
+        --accent-danger: #f85149;
+        --radius: 6px;
+        --radius-lg: 10px;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+      }
+      .sign-in-box {
+        width: 100%;
+        max-width: 400px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg);
+        padding: 2rem 1.75rem;
+        text-align: center;
+      }
+      .logo-box {
+        margin: 0 auto 1.25rem;
+        max-width: 220px;
+      }
+      .logo-box svg,
+      .logo-box img {
+        max-width: 100%;
+        height: auto;
+      }
+      .app-title {
+        margin: 0 0 0.35rem;
+        font-size: 1.35rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .sign-in-message {
+        margin: 0 0 1.5rem;
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        line-height: 1.45;
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 0.7rem 1rem;
+        border: none;
+        border-radius: var(--radius);
+        background: var(--accent-primary);
+        color: #0b1220;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .button:hover {
+        background: var(--accent-primary-hover);
+      }
+      .button:focus-visible {
+        outline: 2px solid var(--accent-primary);
+        outline-offset: 2px;
+      }
+      hr {
+        border: none;
+        border-top: 1px solid var(--border-color);
+        margin: 1.5rem 0;
+      }
+      .field {
+        text-align: left;
+        margin-bottom: 1rem;
+      }
+      .label {
+        display: block;
+        margin-bottom: 0.35rem;
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      .input {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        font-size: 0.95rem;
+      }
+      .input:focus {
+        outline: 2px solid color-mix(in srgb, var(--accent-primary) 45%, transparent);
+        border-color: var(--accent-primary);
+      }
+      .alert {
+        margin-top: 1rem;
+        padding: 0.65rem 0.75rem;
+        background: color-mix(in srgb, var(--accent-danger) 18%, transparent);
+        border: 1px solid color-mix(in srgb, var(--accent-danger) 45%, transparent);
+        color: var(--text-primary);
+        border-radius: var(--radius);
+        text-align: left;
+        font-size: 0.9rem;
+      }
+      .closebtn {
+        float: right;
+        margin-left: 0.5rem;
+        color: var(--text-secondary);
+        font-weight: bold;
+        font-size: 1.25rem;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .closebtn:hover {
+        color: var(--text-primary);
+      }
+      footer {
+        padding: 1rem;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+      }
+      footer a {
+        color: var(--text-secondary);
+        text-decoration: underline;
+      }
+      footer a:hover {
+        color: var(--text-primary);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="sign-in-box">
+        {{ if .LogoData }}
+        <div class="logo-box">
+          {{.LogoData}}
+        </div>
+        {{ end }}
+
+        <h1 class="app-title">DNS Zone Manager</h1>
+
+        <form method="GET" action="{{.ProxyPrefix}}/start">
+          <input type="hidden" name="rd" value="{{.Redirect}}">
+          {{ if .SignInMessage }}
+          <p class="sign-in-message">{{.SignInMessage}}</p>
+          {{ else }}
+          <p class="sign-in-message">Sign in to manage DNS records</p>
+          {{ end }}
+          <button type="submit" class="button">Sign in with {{.ProviderName}}</button>
+        </form>
+
+        {{ if .CustomLogin }}
+        <hr>
+
+        <form method="POST" action="{{.ProxyPrefix}}/sign_in">
+          <input type="hidden" name="rd" value="{{.Redirect}}">
+
+          <div class="field">
+            <label class="label" for="username">Username</label>
+            <input class="input" type="text" placeholder="e.g. user@example.com" name="username" id="username">
+          </div>
+
+          <div class="field">
+            <label class="label" for="password">Password</label>
+            <input class="input" type="password" placeholder="********" name="password" id="password">
+          </div>
+          <button class="button" type="submit">Sign in</button>
+        </form>
+        {{ end }}
+
+        {{ if eq .StatusCode 400 401 }}
+        <div class="alert">
+          <span class="closebtn" onclick="this.parentElement.style.display='none';">&times;</span>
+          {{ if eq .StatusCode 400 }}
+          {{.StatusCode}}: Username cannot be empty
+          {{ else }}
+          {{.StatusCode}}: Invalid Username or Password
+          {{ end }}
+        </div>
+        {{ end }}
+      </div>
+    </main>
+
+    <script>
+      if (window.location.hash) {
+        (function() {
+          var inputs = document.getElementsByName('rd');
+          for (var i = 0; i < inputs.length; i++) {
+            var idx = inputs[i].value.indexOf('#');
+            if (idx >= 0) {
+              inputs[i].value = inputs[i].value.substr(0, idx);
+            }
+            inputs[i].value += window.location.hash;
+          }
+        })();
+      }
+    </script>
+
+    <footer>
+      {{ if eq .Footer "-" }}
+      {{ else if eq .Footer ""}}
+      <p>Secured with <a href="https://github.com/oauth2-proxy/oauth2-proxy#oauth2_proxy">OAuth2 Proxy</a> version {{.Version}}</p>
+      {{ else }}
+      <p>{{.Footer}}</p>
+      {{ end }}
+    </footer>
+  </body>
+</html>
+{{end}}

@@ -199,7 +199,11 @@ services:
       - "4318:4318"   # OTLP HTTP
     volumes:
       - ./observability/otelcol-config.yaml:/otel-lgtm/otelcol-config.yaml:ro
-      - ./observability/dashboards/provisioning.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/custom.yaml:ro
+      # otel-lgtm 0.5.0 only loads providers from grafana-v10.4.1. The JSON
+      # stays on the stable path referenced by provisioning.yaml. Without this,
+      # the home dashboard UID is not in Grafana's DB and annotation queries
+      # fail with "Invalid dashboard UID in annotation request".
+      - ./observability/dashboards/provisioning.yaml:/otel-lgtm/grafana-v10.4.1/conf/provisioning/dashboards/custom.yaml:ro
       - ./observability/dashboards/dns-zone-manager.json:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/dns-zone-manager.json:ro
       - ./observability/dashboards/performance.json:/otel-lgtm/grafana/conf/provisioning/dashboards/custom/performance.json:ro
       - lgtm-data:/data

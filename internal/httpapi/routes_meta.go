@@ -82,13 +82,17 @@ func registerMeta(api huma.API, mux *http.ServeMux, d *Deps) {
 		if u, ok := userFrom(ctx); ok && !u.Zero() && u.AuthType == "proxy" {
 			user = map[string]any{"email": u.Email, "name": u.Name}
 		}
-		return &struct{ Body map[string]any }{Body: map[string]any{
+		cfg := map[string]any{
 			"apiKeyEnabled":    d.Settings.APIKey.Enabled,
 			"proxyAuthEnabled": d.Settings.ProxyAuth.Enabled,
 			"user":             user,
 			"version":          version.Current(),
 			"theme":            d.Settings.Theme.ToUIDict(d.Settings.AppName),
-		}}, nil
+		}
+		if u := strings.TrimSpace(d.Settings.ProxyAuth.LogoutURL); u != "" {
+			cfg["proxyLogoutUrl"] = u
+		}
+		return &struct{ Body map[string]any }{Body: cfg}, nil
 	})
 
 	mux.Handle("GET /metrics", promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{}))

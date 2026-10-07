@@ -13,6 +13,7 @@ import (
 type cliOptions struct {
 	baseURL    string
 	apiKey     string
+	token      string // optional Bearer override (DNS_API_TOKEN / --token)
 	outputJSON bool
 	verbose    bool
 }
@@ -37,7 +38,11 @@ Configure using environment variables:
     export DNS_API_URL=http://dns-api.example.com
     export DNS_API_KEY=your-api-key
 
-Or pass --url and --api-key options.`,
+Or log in with a time-limited OIDC token (device code):
+
+    dns-cli auth login --url http://localhost:8080
+
+Or pass --url and --api-key / --token options.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       version.Current(),
@@ -52,12 +57,18 @@ Or pass --url and --api-key options.`,
 	if keyDefault == "" {
 		keyDefault = os.Getenv("DNS_API_KEY")
 	}
+	tokenDefault := opts.token
+	if tokenDefault == "" {
+		tokenDefault = os.Getenv("DNS_API_TOKEN")
+	}
 	root.PersistentFlags().StringVar(&opts.baseURL, "url", urlDefault, "DNS API server URL")
 	root.PersistentFlags().StringVar(&opts.apiKey, "api-key", keyDefault, "API key for authentication")
+	root.PersistentFlags().StringVar(&opts.token, "token", tokenDefault, "Bearer token (overrides stored login; default: DNS_API_TOKEN)")
 	root.PersistentFlags().BoolVar(&opts.outputJSON, "json", false, "Output raw JSON response")
 	root.PersistentFlags().BoolVarP(&opts.verbose, "verbose", "v", false, "Verbose output")
 
 	root.AddCommand(
+		newAuthCmd(opts),
 		newAddCmd(opts),
 		newDeleteCmd(opts),
 		newReplaceCmd(opts),

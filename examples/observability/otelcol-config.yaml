@@ -1,6 +1,14 @@
-# OpenTelemetry Collector config for grafana/otel-lgtm.
-# Extends the image defaults with a Prometheus scrape of the DNS Zone Manager
-# /metrics endpoint (examples stack: dns-zone-manager; devcontainer: dev).
+# OpenTelemetry Collector config for grafana/otel-lgtm:0.5.0
+# (collector contrib 0.97.0, Prometheus remote-write, Loki 2.9 push API).
+#
+# The image's own otelcol-config.yaml is the base. This file adds a scrape of
+# dns-zone-manager /metrics and promotes service.name to a Loki label so the
+# dashboards can query {service_name="dns-zone-manager"}.
+#
+# Do not switch this to the newer otel-lgtm pipelines (otlp_http to
+# Prometheus/Loki OTLP, or otlp_grpc profiles). Collector 0.97.0 rejects
+# those exporters and then exits, which leaves Grafana with no metrics and
+# no logs.
 receivers:
   otlp:
     protocols:
@@ -8,9 +16,6 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
-        cors:
-          allowed_origins:
-            - http://*
   prometheus/collector:
     config:
       scrape_configs:
@@ -18,62 +23,81 @@ receivers:
           scrape_interval: 15s
           static_configs:
             - targets: ["127.0.0.1:8888"]
-  prometheus/dns-zone-manager:
-    config:
-      scrape_configs:
         - job_name: "dns-zone-manager"
           scrape_interval: 5s
           metrics_path: /metrics
           static_configs:
             # One of these resolves depending on which compose file is running;
-            # the other target simply fails to scrape and is ignored.
+            # the other target fails to scrape and is ignored.
             - targets:
                 - "dns-zone-manager:8000"
                 - "dev:8000"
               labels:
                 service: dns-zone-manager
 
-extensions:
-  health_check:
-    endpoint: 0.0.0.0:13133
-    path: "/ready"
-
 processors:
   batch:
+  # Indexed Loki labels. Everything else stays in the logfmt line.
+  # Dots in hint names are normalized (request.method -> request_method).
+  resource/loki:
+    attributes:
+      - key: loki.resource.labels
+        value: service.name
+        action: upsert
+      - key: loki.format
+        value: logfmt
+        action: upsert
+  # The Loki exporter's default JSON line nests every slog field under
+  # "attributes", so LogQL has to dig them out. Copy the fields onto the
+  # body (logfmt flattens that map: request.method -> request_method) and
+  # keep only the low-cardinality keys as real labels.
+  transform/loki:
+    error_mode: ignore
+    log_statements:
+      - context: resource
+        statements:
+          # Drop SDK noise from the line. service.name stays so it can be a label.
+          - keep_keys(attributes, ["service.name", "loki.resource.labels", "loki.format"])
+      - context: log
+        statements:
+          # Body becomes the field map the logfmt encoder flattens
+          # (request.method -> request_method). Lift the same keys to
+          # attributes so they are indexed, then drop the originals so they
+          # are not written a second time as attribute_*.
+          - set(attributes["msg"], body) where IsString(body)
+          - set(body, attributes)
+          - set(attributes["request_method"], attributes["request"]["method"]) where attributes["request"]["method"] != nil
+          - set(attributes["response_outcome"], attributes["response"]["outcome"]) where attributes["response"]["outcome"] != nil
+          - set(attributes["response_status_code"], attributes["response"]["status_code"]) where attributes["response"]["status_code"] != nil
+          - keep_keys(attributes, ["event", "zone", "request_method", "response_outcome", "response_status_code"])
+          - set(attributes["loki.attribute.labels"], "event,zone,request_method,response_outcome,response_status_code")
 
 exporters:
-  otlp_http/metrics:
-    endpoint: http://127.0.0.1:9090/api/v1/otlp
-    tls:
-      insecure: true
-  otlp_http/traces:
+  prometheusremotewrite:
+    endpoint: http://127.0.0.1:9090/api/v1/write
+    # Keep scraped names (dns_zone_manager_*_total, *_bytes) as exposed.
+    add_metric_suffixes: false
+  otlphttp:
     endpoint: http://127.0.0.1:4418
-    tls:
-      insecure: true
-  otlp_http/logs:
-    endpoint: http://127.0.0.1:3100/otlp
-    tls:
-      insecure: true
-  otlp_grpc/profiles:
-    endpoint: http://127.0.0.1:4040
-    tls:
-      insecure: true
+  loki:
+    endpoint: http://127.0.0.1:3100/loki/api/v1/push
+    default_labels_enabled:
+      exporter: false
+      job: true
+      instance: true
+      level: true
 
 service:
-  extensions: [health_check]
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp_http/traces]
+      exporters: [otlphttp]
     metrics:
-      receivers: [otlp, prometheus/collector, prometheus/dns-zone-manager]
+      receivers: [otlp, prometheus/collector]
       processors: [batch]
-      exporters: [otlp_http/metrics]
+      exporters: [prometheusremotewrite]
     logs:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [otlp_http/logs]
-    profiles:
-      receivers: [otlp]
-      exporters: [otlp_grpc/profiles]
+      processors: [resource/loki, transform/loki, batch]
+      exporters: [loki]

@@ -13,6 +13,7 @@ export function createInitialState(config: AppConfig): AppState {
     loginError: '',
     apiKeyEnabled: config.apiKeyEnabled ?? true,
     proxyAuthEnabled: config.proxyAuthEnabled ?? false,
+    proxyLogoutUrl: config.proxyLogoutUrl ?? null,
     currentUser: null,
     appVersion: '',
 

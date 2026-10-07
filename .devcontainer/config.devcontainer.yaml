@@ -25,10 +25,29 @@ dns:
   pool_size: 256
   update_tsig_key: dns-api-key
 
-# No authentication in the devcontainer — anonymous access is intentional.
-# Re-enable api_key / proxy_auth here if you need to exercise them.
+# Authentication is on in the devcontainer so the Traefik + oauth2-proxy +
+# Entra-emulator front door (http://localhost:8080) can be exercised end to
+# end. Direct access to :8000 accepts API keys; traffic through Traefik uses
+# proxy_auth identity headers injected by oauth2-proxy (clients cannot spoof
+# those headers through the proxy). Spoofing headers against :8000 directly
+# is possible — that is intentional for local development only.
 api_key:
-  enabled: false
+  enabled: true
+  header_name: X-API-Key
+  keys:
+    - name: dev
+      secret: dev
+    - name: alice
+      secret: demo-api-key-12345
+
+proxy_auth:
+  enabled: true
+  user_header: X-Auth-Request-Email
+  name_header: X-Auth-Request-Preferred-Username
+  # Front-channel IdP logout (clears Entra ee_session), then returns to
+  # oauth2-proxy sign_out to clear the app cookie. Without this, logout only
+  # clears oauth2-proxy and Entra silent-SSO logs the user straight back in.
+  logout_url: http://localhost:8444/6f89cf12-978b-4d23-ac18-9ef0c127cf87/oauth2/v2.0/logout?client_id=c9c2fd4f-4c1e-44a3-9cd5-a1a1191fe9a3&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Foauth2%2Fsign_out
 
 # Cache Configuration
 cache:
@@ -105,11 +124,11 @@ scheduler:
   lease_ttl: 120
   default_expiry_window: 3600
 
-# Outbound change webhooks (Slack / Teams / generic)
-# Enabled with no targets: manual changes are recorded in the scheduler store
-# (so the Manual source filter and change links work) but nothing is delivered,
-# which keeps local development free of retries against unreachable endpoints.
-# Add a target below to exercise real delivery.
+# Outbound change webhooks (Slack / Teams / generic).
+# Manual DNS edits are autorecorded into the scheduler/audit store whenever the
+# scheduler store is open (default); that does not require webhooks.enabled.
+# Leave enabled false here so local dev does not retry unreachable targets.
+# Add a target and set enabled: true to exercise real delivery.
 webhooks:
   enabled: false
   base_url: http://localhost:8000

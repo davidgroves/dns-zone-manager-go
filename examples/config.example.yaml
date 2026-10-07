@@ -107,6 +107,12 @@ proxy_auth:
   # Request header carrying the user's display name (optional).
   name_header: X-Auth-Request-Preferred-Username
 
+  # Optional IdP front-channel logout URL for the SPA Logout button.
+  # Use the provider's end_session endpoint with a post_logout_redirect_uri
+  # that lands on /oauth2/sign_out so both the IdP session and the
+  # oauth2-proxy cookie are cleared (otherwise silent SSO logs the user back in).
+  # logout_url: https://login.microsoftonline.com/<tenant>/oauth2/v2.0/logout?post_logout_redirect_uri=https%3A%2F%2Fapp.example.com%2Foauth2%2Fsign_out
+
 # =============================================================================
 # Zone Cache Configuration
 # =============================================================================
@@ -408,8 +414,9 @@ webhooks:
     - change_failed
 
   # Record every manual (non-scheduler) change in the scheduler store as an
-  # already-applied change, so every notification has a working link.
-  # Requires the scheduler section to be enabled.
+  # already-applied change (audit log + Scheduled Changes "Manual" source).
+  # Independent of webhooks.enabled; requires the scheduler store (scheduler
+  # enabled). When webhooks are also enabled, notifications get a working link.
   autorecord_manual_changes: true
 
   targets:

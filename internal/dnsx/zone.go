@@ -408,6 +408,8 @@ func (z *Zone) Search(namePattern, valuePattern *regexp.Regexp, typ *uint16, off
 }
 
 // AddRecords appends rdata strings to an RRset (optimistic cache update).
+// Identical rdata already present is skipped so a later IXFR of the same RR
+// does not create duplicate values in the cache.
 func (z *Zone) AddRecords(name string, typ, class uint16, ttl uint32, rdata []string) error {
 	z.mu.Lock()
 	defer z.mu.Unlock()
@@ -443,6 +445,17 @@ func (z *Zone) addRecordsLocked(name string, typ, class uint16, ttl uint32, rdat
 		parsed.Header().Rdlength = 0
 		parsed.Header().Ttl = rs.TTL
 		parsed.Header().Class = class
+		rdataText := RdataText(parsed)
+		dup := false
+		for _, existing := range rs.Records {
+			if RdataText(existing) == rdataText {
+				dup = true
+				break
+			}
+		}
+		if dup {
+			continue
+		}
 		rs.Records = append(rs.Records, parsed)
 		z.recordCount++
 	}
