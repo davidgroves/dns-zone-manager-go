@@ -282,6 +282,42 @@ func TestZoneDelete(t *testing.T) {
 	}
 }
 
+func TestZoneCatalogAdd(t *testing.T) {
+	var gotMethod, gotPath string
+	_, opts := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath = r.Method, r.URL.Path
+		_ = json.NewEncoder(w).Encode(map[string]any{"zone": "staged.example.", "catalog_added": true})
+	})
+	stdout, _, err := runCLI(t, opts, "zone", "catalog", "add", "staged.example.")
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if gotMethod != http.MethodPut || gotPath != "/v1/zones/staged.example./catalog" {
+		t.Fatalf("request %s %s", gotMethod, gotPath)
+	}
+	if !strings.Contains(stdout, "Published zone") {
+		t.Fatalf("stdout=%q", stdout)
+	}
+}
+
+func TestZoneCatalogRemove(t *testing.T) {
+	var gotMethod, gotPath string
+	_, opts := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotPath = r.Method, r.URL.Path
+		_ = json.NewEncoder(w).Encode(map[string]any{"zone": "staged.example.", "catalog_removed": true})
+	})
+	stdout, _, err := runCLI(t, opts, "zone", "catalog", "remove", "staged.example.")
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if gotMethod != http.MethodDelete || gotPath != "/v1/zones/staged.example./catalog" {
+		t.Fatalf("request %s %s", gotMethod, gotPath)
+	}
+	if !strings.Contains(stdout, "Removed zone") {
+		t.Fatalf("stdout=%q", stdout)
+	}
+}
+
 func TestRNDCStatusCLI(t *testing.T) {
 	_, opts := testServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/rndc/status" {

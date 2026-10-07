@@ -150,6 +150,94 @@ func registerProvision(api huma.API, d *Deps) {
 		}
 		return &statusBody{Status: http.StatusOK, Body: provisionResultMap(res)}, nil
 	})
+
+	type catalogMemberIn struct {
+		Zone          string `path:"zone"`
+		ScheduledAt   string `query:"scheduled_at"`
+		NotValidAfter string `query:"not_valid_after"`
+		Name          string `query:"name"`
+	}
+	parseCatalogSchedule := func(in *catalogMemberIn) (at *time.Time, nva *time.Time, err error) {
+		if in.ScheduledAt == "" {
+			return nil, nil, nil
+		}
+		t, perr := time.Parse(time.RFC3339Nano, in.ScheduledAt)
+		if perr != nil {
+			t, perr = time.Parse(time.RFC3339, in.ScheduledAt)
+		}
+		if perr != nil {
+			return nil, nil, badRequest("invalid scheduled_at")
+		}
+		at = &t
+		if in.NotValidAfter != "" {
+			nv, perr := time.Parse(time.RFC3339Nano, in.NotValidAfter)
+			if perr != nil {
+				nv, perr = time.Parse(time.RFC3339, in.NotValidAfter)
+			}
+			if perr != nil {
+				return nil, nil, badRequest("invalid not_valid_after")
+			}
+			nva = &nv
+		}
+		return at, nva, nil
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "add-zone-to-catalog",
+		Method:      http.MethodPut,
+		Path:        "/v1/zones/{zone}/catalog",
+		Summary:     "Publish a zone to the catalog",
+		Tags:        []string{"Zones"},
+	}, func(ctx context.Context, in *catalogMemberIn) (*statusBody, error) {
+		if d.Provisioner == nil {
+			return nil, rndcNotConfigured()
+		}
+		zone := normalizeZone(in.Zone)
+		at, nva, err := parseCatalogSchedule(in)
+		if err != nil {
+			return nil, err
+		}
+		if at != nil {
+			ch, err := scheduleZoneChange(ctx, d, store.KindZoneCatalogAdd, zone, in.Name, nil, at, nva, map[string]any{"zone": zone})
+			if err != nil {
+				return nil, err
+			}
+			return &statusBody{Status: http.StatusAccepted, Body: scheduledChangeResponse(ch)}, nil
+		}
+		res, err := d.Provisioner.AddToCatalog(ctx, zone)
+		if err != nil {
+			return nil, mapProvisionErr(err)
+		}
+		return &statusBody{Status: http.StatusOK, Body: provisionResultMap(res)}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "remove-zone-from-catalog",
+		Method:      http.MethodDelete,
+		Path:        "/v1/zones/{zone}/catalog",
+		Summary:     "Remove a zone from the catalog (keep on primary)",
+		Tags:        []string{"Zones"},
+	}, func(ctx context.Context, in *catalogMemberIn) (*statusBody, error) {
+		if d.Provisioner == nil {
+			return nil, rndcNotConfigured()
+		}
+		zone := normalizeZone(in.Zone)
+		at, nva, err := parseCatalogSchedule(in)
+		if err != nil {
+			return nil, err
+		}
+		if at != nil {
+			ch, err := scheduleZoneChange(ctx, d, store.KindZoneCatalogRemove, zone, in.Name, nil, at, nva, map[string]any{"zone": zone})
+			if err != nil {
+				return nil, err
+			}
+			return &statusBody{Status: http.StatusAccepted, Body: scheduledChangeResponse(ch)}, nil
+		}
+		res, err := d.Provisioner.RemoveFromCatalog(ctx, zone)
+		if err != nil {
+			return nil, mapProvisionErr(err)
+		}
+		return &statusBody{Status: http.StatusOK, Body: provisionResultMap(res)}, nil
+	})
 }
 
 func scheduleZoneChange(ctx context.Context, d *Deps, kind, zone, name string, desc *string, at, nva *time.Time, payload any) (*store.ScheduledChange, error) {
@@ -204,6 +292,9 @@ func mapProvisionErr(err error) error {
 	}
 	if errors.Is(err, provision.ErrDisabled) {
 		return rndcNotConfigured()
+	}
+	if errors.Is(err, provision.ErrCatalogDisabled) {
+		return problem(http.StatusNotImplemented, "catalog_not_configured", "Not Implemented", "Catalog is not configured")
 	}
 	if errors.Is(err, provision.ErrZoneExists) {
 		return conflict(err.Error())

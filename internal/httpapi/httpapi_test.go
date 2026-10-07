@@ -417,13 +417,19 @@ func TestCursorEncodeDecodeVariants(t *testing.T) {
 }
 
 type fakeProvisioner struct {
-	status    provision.Status
-	create    provision.Result
-	createErr error
-	delete    provision.Result
-	deleteErr error
-	created   []provision.CreateRequest
-	deleted   []string
+	status         provision.Status
+	create         provision.Result
+	createErr      error
+	delete         provision.Result
+	deleteErr      error
+	catalogAdd     provision.Result
+	catalogAddErr  error
+	catalogRem     provision.Result
+	catalogRemErr  error
+	created        []provision.CreateRequest
+	deleted        []string
+	catalogAdded   []string
+	catalogRemoved []string
 }
 
 func (f *fakeProvisioner) CreateZone(_ context.Context, req provision.CreateRequest) (provision.Result, error) {
@@ -446,6 +452,36 @@ func (f *fakeProvisioner) DeleteZone(_ context.Context, zone string, _ provision
 	res := f.delete
 	if res.Zone == "" {
 		res.Zone = zone
+	}
+	return res, nil
+}
+
+func (f *fakeProvisioner) AddToCatalog(_ context.Context, zone string) (provision.Result, error) {
+	f.catalogAdded = append(f.catalogAdded, zone)
+	if f.catalogAddErr != nil {
+		return provision.Result{}, f.catalogAddErr
+	}
+	res := f.catalogAdd
+	if res.Zone == "" {
+		res.Zone = zone
+	}
+	if !res.CatalogAdded {
+		res.CatalogAdded = true
+	}
+	return res, nil
+}
+
+func (f *fakeProvisioner) RemoveFromCatalog(_ context.Context, zone string) (provision.Result, error) {
+	f.catalogRemoved = append(f.catalogRemoved, zone)
+	if f.catalogRemErr != nil {
+		return provision.Result{}, f.catalogRemErr
+	}
+	res := f.catalogRem
+	if res.Zone == "" {
+		res.Zone = zone
+	}
+	if !res.CatalogRemoved {
+		res.CatalogRemoved = true
 	}
 	return res, nil
 }
@@ -513,5 +549,56 @@ func TestCreateAndDeleteZoneWithProvisioner(t *testing.T) {
 	}
 	if len(fp.deleted) != 1 {
 		t.Fatalf("deleted=%v", fp.deleted)
+	}
+}
+
+func TestAddAndRemoveZoneCatalog(t *testing.T) {
+	settings := testSettings()
+	fp := &fakeProvisioner{
+		status: provision.Status{Enabled: true, Connected: true, CatalogEnabled: true},
+	}
+	h := httpapi.New(httpapi.Deps{
+		Settings:    settings,
+		Auth:        auth.NewCombined(settings),
+		Provisioner: fp,
+		DNSReady:    func(context.Context) bool { return true },
+		StoreReady:  func(context.Context) bool { return true },
+	})
+
+	put := httptest.NewRequest(http.MethodPut, "/v1/zones/staged.example./catalog", nil)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, put)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("put %d %s", rr.Code, rr.Body.String())
+	}
+	if len(fp.catalogAdded) != 1 || fp.catalogAdded[0] != "staged.example." {
+		t.Fatalf("catalogAdded=%v", fp.catalogAdded)
+	}
+	var putBody map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &putBody); err != nil {
+		t.Fatal(err)
+	}
+	if putBody["catalog_added"] != true {
+		t.Fatalf("put body=%v", putBody)
+	}
+
+	del := httptest.NewRequest(http.MethodDelete, "/v1/zones/staged.example./catalog", nil)
+	rr2 := httptest.NewRecorder()
+	h.ServeHTTP(rr2, del)
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("delete catalog %d %s", rr2.Code, rr2.Body.String())
+	}
+	if len(fp.catalogRemoved) != 1 {
+		t.Fatalf("catalogRemoved=%v", fp.catalogRemoved)
+	}
+}
+
+func TestAddZoneCatalogRequiresRNDC(t *testing.T) {
+	h := testHandler(t)
+	req := httptest.NewRequest(http.MethodPut, "/v1/zones/x.example./catalog", nil)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotImplemented {
+		t.Fatalf("got %d %s", rr.Code, rr.Body.String())
 	}
 }

@@ -270,6 +270,71 @@ func (p *Provisioner) DeleteZone(ctx context.Context, zone string, opts DeleteOp
 	return res, nil
 }
 
+// AddToCatalog publishes an existing zone into the catalog (PTR membership).
+// Catalog DDNS failures are returned as hard errors (unlike CreateZone).
+func (p *Provisioner) AddToCatalog(ctx context.Context, zone string) (Result, error) {
+	if !p.enabled() {
+		return Result{}, ErrDisabled
+	}
+	zone = dnsx.NormalizeZoneName(zone)
+	if err := dnsx.ValidateZoneName(zone); err != nil {
+		return Result{}, err
+	}
+	if !p.wantCatalog() {
+		return Result{}, ErrCatalogDisabled
+	}
+	if err := p.requireZoneExists(ctx, zone); err != nil {
+		return Result{}, err
+	}
+	added, err := p.addCatalogMember(ctx, zone)
+	if err != nil {
+		p.recordAudit(ctx, "zone_catalog_add", zone, false, err)
+		return Result{}, err
+	}
+	res := Result{Zone: zone, CatalogAdded: added}
+	p.recordAudit(ctx, "zone_catalog_add", zone, true, nil)
+	return res, nil
+}
+
+// RemoveFromCatalog unpublishes a zone from the catalog without deleting it from BIND.
+func (p *Provisioner) RemoveFromCatalog(ctx context.Context, zone string) (Result, error) {
+	if !p.enabled() {
+		return Result{}, ErrDisabled
+	}
+	zone = dnsx.NormalizeZoneName(zone)
+	if err := dnsx.ValidateZoneName(zone); err != nil {
+		return Result{}, err
+	}
+	if !p.wantCatalog() {
+		return Result{}, ErrCatalogDisabled
+	}
+	if err := p.requireZoneExists(ctx, zone); err != nil {
+		return Result{}, err
+	}
+	removed, err := p.removeCatalogMember(ctx, zone)
+	if err != nil {
+		p.recordAudit(ctx, "zone_catalog_remove", zone, false, err)
+		return Result{}, err
+	}
+	res := Result{Zone: zone, CatalogRemoved: removed}
+	p.recordAudit(ctx, "zone_catalog_remove", zone, true, nil)
+	return res, nil
+}
+
+func (p *Provisioner) requireZoneExists(ctx context.Context, zone string) error {
+	if p.cache != nil {
+		if cz := p.cache.PeekZone(zone); cz != nil {
+			return nil
+		}
+	}
+	if p.client != nil {
+		if _, err := p.client.QuerySOA(ctx, zone); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %s", ErrZoneNotFound, zone)
+}
+
 func (p *Provisioner) waitReady(ctx context.Context, zone string, timeout time.Duration) (uint32, error) {
 	if timeout <= 0 {
 		timeout = 30 * time.Second

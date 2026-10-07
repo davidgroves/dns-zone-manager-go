@@ -56,14 +56,11 @@ make build test test-race lint frontend-build
 go test ./...
 go test -tags=integration ./tests/integration/...
 npm run test && npm run typecheck
-uv is NOT used — this is Go, not the Python tree.
 ```
 
 ## Config
 
-`examples/config.example.yaml` — includes Go fields: `dns.pool_size`,
-`dns.pool_idle_timeout`, `cache.serial_refresh_debounce`,
-`metrics.per_zone_labels`, server timeouts, `live.ping_interval`, secret files.
+`examples/config.example.yaml`.
 
 ## Gotchas
 

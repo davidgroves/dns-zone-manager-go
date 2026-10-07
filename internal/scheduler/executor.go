@@ -17,10 +17,12 @@ import (
 	"github.com/davidgroves/dns-zone-manager-go/internal/store"
 )
 
-// ZoneProvisioner applies zone_create / zone_delete scheduled changes.
+// ZoneProvisioner applies zone create/delete/catalog scheduled changes.
 type ZoneProvisioner interface {
 	CreateZone(ctx context.Context, req provision.CreateRequest) (provision.Result, error)
 	DeleteZone(ctx context.Context, zone string, opts provision.DeleteOptions) (provision.Result, error)
+	AddToCatalog(ctx context.Context, zone string) (provision.Result, error)
+	RemoveFromCatalog(ctx context.Context, zone string) (provision.Result, error)
 }
 
 // ExecutionResult is the outcome of executing a scheduled change.
@@ -67,7 +69,8 @@ func ExecuteChange(
 	if kind == "" {
 		kind = store.KindRecords
 	}
-	if kind == store.KindZoneCreate || kind == store.KindZoneDelete {
+	switch kind {
+	case store.KindZoneCreate, store.KindZoneDelete, store.KindZoneCatalogAdd, store.KindZoneCatalogRemove:
 		return executeZoneChange(ctx, change, st, opts, kind, zone)
 	}
 
@@ -242,6 +245,10 @@ func executeZoneChange(
 			}
 		}
 		res, err = opts.Provisioner.DeleteZone(ctx, zone, delOpts)
+	case store.KindZoneCatalogAdd:
+		res, err = opts.Provisioner.AddToCatalog(ctx, zone)
+	case store.KindZoneCatalogRemove:
+		res, err = opts.Provisioner.RemoveFromCatalog(ctx, zone)
 	default:
 		return failChange(ctx, st, change.ID, "unsupported change kind "+kind, opts, "build_error", nil)
 	}

@@ -43,8 +43,11 @@ export function createInitialState(config: AppConfig): AppState {
     rndcStatus: null,
     showCreateZone: false,
     showDeleteZoneConfirm: false,
+    showPublishCatalogConfirm: false,
+    showUnpublishCatalogConfirm: false,
     creatingZone: false,
     deletingZone: false,
+    catalogMembershipBusy: false,
     createZoneForm: {
       zone: '',
       primaryNs: '',

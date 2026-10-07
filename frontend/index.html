@@ -235,8 +235,8 @@
                                           :title="zone.zone_utf8 + '\nClick to copy to clipboard'"
                                           @click.stop="navigator.clipboard.writeText(zone.zone_utf8); toast('Copied: ' + zone.zone_utf8, 'success')">🌐</span>
                                 </template>
-                                <template x-if="catalogZones.has(zone.zone.toLowerCase())">
-                                    <span class="badge badge-success" style="font-size: 0.6rem; margin-left: 0.25rem;" title="From catalog">CAT</span>
+                                <template x-if="zoneInCatalog(zone.zone)">
+                                    <span class="badge badge-success" style="font-size: 0.6rem; margin-left: 0.25rem;" title="In catalog">CAT</span>
                                 </template>
                             </div>
                             <div class="zone-meta">
@@ -928,6 +928,22 @@
                                         </svg>
                                         History
                                     </button>
+                                    <button
+                                        x-show="rndcStatus && rndcStatus.enabled && rndcStatus.catalog_enabled && selectedZone && !zoneInCatalog(selectedZone)"
+                                        @click="showPublishCatalogConfirm = true"
+                                        class="btn btn-ghost btn-sm"
+                                        title="Publish zone to catalog so secondaries pick it up"
+                                        :disabled="catalogMembershipBusy">
+                                        Publish to catalog
+                                    </button>
+                                    <button
+                                        x-show="rndcStatus && rndcStatus.enabled && rndcStatus.catalog_enabled && selectedZone && zoneInCatalog(selectedZone)"
+                                        @click="showUnpublishCatalogConfirm = true"
+                                        class="btn btn-ghost btn-sm"
+                                        title="Remove from catalog; zone stays on primary"
+                                        :disabled="catalogMembershipBusy">
+                                        Remove from catalog
+                                    </button>
                                     <button x-show="rndcStatus && rndcStatus.enabled" @click="showDeleteZoneConfirm = true" class="btn btn-ghost btn-sm" title="Delete zone from BIND">
                                         Delete zone
                                     </button>
@@ -1135,10 +1151,14 @@
                         <label>Nameservers (one per line)</label>
                         <textarea x-model="createZoneForm.nameservers" rows="3"></textarea>
                     </div>
-                    <label class="checkbox">
+                    <label class="checkbox" x-show="rndcStatus && rndcStatus.catalog_enabled !== false">
                         <input type="checkbox" x-model="createZoneForm.addToCatalog">
-                        Add to catalog
+                        Add to catalog now (secondaries will pick it up)
                     </label>
+                    <p class="text-muted" style="font-size: 0.85rem; margin: 0.25rem 0 0;"
+                       x-show="rndcStatus && rndcStatus.catalog_enabled !== false && !createZoneForm.addToCatalog">
+                        Zone stays on the primary only. Publish to catalog later from the zone view.
+                    </p>
                     <label class="checkbox">
                         <input type="checkbox" x-model="createZoneForm.schedule">
                         Schedule instead of applying now
@@ -1151,6 +1171,44 @@
                 <div class="modal-footer">
                     <button @click="showCreateZone = false" class="btn btn-ghost">Cancel</button>
                     <button @click="createZone()" class="btn btn-success" :disabled="!createZoneForm.zone || creatingZone">Create</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Publish to Catalog Confirmation -->
+    <template x-if="showPublishCatalogConfirm">
+        <div class="modal-backdrop" @click.self="showPublishCatalogConfirm = false">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>Publish to Catalog</h3>
+                    <button @click="showPublishCatalogConfirm = false" class="btn btn-ghost btn-icon btn-sm">×</button>
+                </div>
+                <div class="modal-body">
+                    <p>Publish <strong x-text="selectedZone"></strong> to the catalog? Secondaries that consume the catalog will start serving this zone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button @click="showPublishCatalogConfirm = false" class="btn btn-ghost">Cancel</button>
+                    <button @click="publishSelectedZoneToCatalog()" class="btn btn-success" :disabled="catalogMembershipBusy">Publish</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Remove from Catalog Confirmation -->
+    <template x-if="showUnpublishCatalogConfirm">
+        <div class="modal-backdrop" @click.self="showUnpublishCatalogConfirm = false">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3>Remove from Catalog</h3>
+                    <button @click="showUnpublishCatalogConfirm = false" class="btn btn-ghost btn-icon btn-sm">×</button>
+                </div>
+                <div class="modal-body">
+                    <p>Remove <strong x-text="selectedZone"></strong> from the catalog? Secondaries will stop advertising this zone; it remains on the primary.</p>
+                </div>
+                <div class="modal-footer">
+                    <button @click="showUnpublishCatalogConfirm = false" class="btn btn-ghost">Cancel</button>
+                    <button @click="unpublishSelectedZoneFromCatalog()" class="btn btn-danger" :disabled="catalogMembershipBusy">Remove from catalog</button>
                 </div>
             </div>
         </div>

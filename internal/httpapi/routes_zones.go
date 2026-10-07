@@ -43,6 +43,7 @@ func registerZones(api huma.API, mux *http.ServeMux, d *Deps) {
 			offset = &in.Offset
 		}
 		zones, total, next, hasMore := d.Cache.ListZonesPaginated(after, limit, offset)
+		members := catalogMemberSet(d)
 		out := PaginatedZones{
 			Zones:      make([]ZoneSummary, 0, len(zones)),
 			TotalCount: total,
@@ -50,7 +51,7 @@ func registerZones(api huma.API, mux *http.ServeMux, d *Deps) {
 			PageSize:   limit,
 		}
 		for _, z := range zones {
-			out.Zones = append(out.Zones, zoneSummaryFrom(z))
+			out.Zones = append(out.Zones, zoneSummaryFrom(z, zoneInCatalog(members, z.ZoneName)))
 		}
 		if next != nil && *next != "" {
 			c := encodeZoneCursor(*next)
@@ -81,7 +82,7 @@ func registerZones(api huma.API, mux *http.ServeMux, d *Deps) {
 		if cz == nil {
 			return nil, notFound("Zone '" + zone + "' not found")
 		}
-		return &struct{ Body ZoneDetail }{Body: zoneDetailFrom(cz)}, nil
+		return &struct{ Body ZoneDetail }{Body: zoneDetailFrom(cz, zoneInCatalog(catalogMemberSet(d), zone))}, nil
 	})
 
 	huma.Register(api, huma.Operation{
@@ -99,7 +100,7 @@ func registerZones(api huma.API, mux *http.ServeMux, d *Deps) {
 		if err != nil {
 			return nil, mapDNSUpdateErr(err)
 		}
-		return &struct{ Body ZoneDetail }{Body: zoneDetailFrom(cz)}, nil
+		return &struct{ Body ZoneDetail }{Body: zoneDetailFrom(cz, zoneInCatalog(catalogMemberSet(d), zone))}, nil
 	})
 
 	huma.Register(api, huma.Operation{

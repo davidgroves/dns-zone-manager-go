@@ -15,7 +15,7 @@ func newZoneCmd(opts *cliOptions) *cobra.Command {
 		Use:   "zone",
 		Short: "Create or delete zones via rndc",
 	}
-	cmd.AddCommand(newZoneCreateCmd(opts), newZoneDeleteCmd(opts))
+	cmd.AddCommand(newZoneCreateCmd(opts), newZoneDeleteCmd(opts), newZoneCatalogCmd(opts))
 	return cmd
 }
 
@@ -133,6 +133,97 @@ func newZoneDeleteCmd(opts *cliOptions) *cobra.Command {
 	cmd.Flags().BoolVar(&keepFiles, "keep-files", false, "Leave zone files on disk (no delzone -clean)")
 	cmd.Flags().BoolVar(&noCatalog, "no-catalog", false, "Do not remove catalog membership")
 	cmd.Flags().StringVar(&at, "at", "", "Schedule delete at RFC3339 time")
+	return cmd
+}
+
+func newZoneCatalogCmd(opts *cliOptions) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "catalog",
+		Short: "Publish or unpublish a zone in the catalog",
+	}
+	cmd.AddCommand(newZoneCatalogAddCmd(opts), newZoneCatalogRemoveCmd(opts))
+	return cmd
+}
+
+func newZoneCatalogAddCmd(opts *cliOptions) *cobra.Command {
+	var at string
+	cmd := &cobra.Command{
+		Use:   "add ZONE",
+		Short: "Publish an existing zone to the catalog",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := newAPIClient(opts)
+			if err != nil {
+				return err
+			}
+			q := url.Values{}
+			if at != "" {
+				if _, err := time.Parse(time.RFC3339, at); err != nil {
+					return fmt.Errorf("invalid --at: %w", err)
+				}
+				q.Set("scheduled_at", at)
+			}
+			resp, data, err := client.do(http.MethodPut, zonePath(args[0])+"/catalog", q, nil, "")
+			if err != nil {
+				return err
+			}
+			done, err := emitResponse(opts, resp, data)
+			if done {
+				return err
+			}
+			if resp.StatusCode == http.StatusAccepted {
+				return printScheduledAck(data)
+			}
+			var res map[string]any
+			if err := json.Unmarshal(data, &res); err != nil {
+				return fmt.Errorf("failed to parse response: %w", err)
+			}
+			success(fmt.Sprintf("Published zone %v to catalog", res["zone"]))
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&at, "at", "", "Schedule catalog add at RFC3339 time")
+	return cmd
+}
+
+func newZoneCatalogRemoveCmd(opts *cliOptions) *cobra.Command {
+	var at string
+	cmd := &cobra.Command{
+		Use:   "remove ZONE",
+		Short: "Remove a zone from the catalog (keep on primary)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			client, err := newAPIClient(opts)
+			if err != nil {
+				return err
+			}
+			q := url.Values{}
+			if at != "" {
+				if _, err := time.Parse(time.RFC3339, at); err != nil {
+					return fmt.Errorf("invalid --at: %w", err)
+				}
+				q.Set("scheduled_at", at)
+			}
+			resp, data, err := client.do(http.MethodDelete, zonePath(args[0])+"/catalog", q, nil, "")
+			if err != nil {
+				return err
+			}
+			done, err := emitResponse(opts, resp, data)
+			if done {
+				return err
+			}
+			if resp.StatusCode == http.StatusAccepted {
+				return printScheduledAck(data)
+			}
+			var res map[string]any
+			if err := json.Unmarshal(data, &res); err != nil {
+				return fmt.Errorf("failed to parse response: %w", err)
+			}
+			success(fmt.Sprintf("Removed zone %v from catalog", res["zone"]))
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&at, "at", "", "Schedule catalog remove at RFC3339 time")
 	return cmd
 }
 

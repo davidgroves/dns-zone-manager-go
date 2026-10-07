@@ -29,6 +29,7 @@ type ZoneSummary struct {
 	LastRefresh string  `json:"last_refresh"`
 	ZoneIsIDN   bool    `json:"zone_is_idn"`
 	ZoneUTF8    *string `json:"zone_utf8,omitempty"`
+	InCatalog   bool    `json:"in_catalog"`
 }
 
 type ZoneDetail struct {
@@ -39,15 +40,17 @@ type ZoneDetail struct {
 	SOARefresh  uint32  `json:"soa_refresh,omitempty"`
 	ZoneIsIDN   bool    `json:"zone_is_idn"`
 	ZoneUTF8    *string `json:"zone_utf8,omitempty"`
+	InCatalog   bool    `json:"in_catalog"`
 }
 
-func zoneSummaryFrom(cz *dnsx.CachedZone) ZoneSummary {
+func zoneSummaryFrom(cz *dnsx.CachedZone, inCatalog bool) ZoneSummary {
 	info := dnsx.GetIDNInfo(cz.ZoneName)
 	s := ZoneSummary{
 		Zone:        cz.ZoneName,
 		Serial:      cz.Serial,
 		LastRefresh: cz.LastRefresh.UTC().Format(time.RFC3339Nano),
 		ZoneIsIDN:   info["has_idn"].(bool),
+		InCatalog:   inCatalog,
 	}
 	if cz.Zone != nil {
 		s.RRsetCount = cz.Zone.RRsetCount()
@@ -58,8 +61,8 @@ func zoneSummaryFrom(cz *dnsx.CachedZone) ZoneSummary {
 	return s
 }
 
-func zoneDetailFrom(cz *dnsx.CachedZone) ZoneDetail {
-	sum := zoneSummaryFrom(cz)
+func zoneDetailFrom(cz *dnsx.CachedZone, inCatalog bool) ZoneDetail {
+	sum := zoneSummaryFrom(cz, inCatalog)
 	d := ZoneDetail{
 		Zone:        sum.Zone,
 		Serial:      sum.Serial,
@@ -68,8 +71,29 @@ func zoneDetailFrom(cz *dnsx.CachedZone) ZoneDetail {
 		SOARefresh:  cz.SOARefresh,
 		ZoneIsIDN:   sum.ZoneIsIDN,
 		ZoneUTF8:    sum.ZoneUTF8,
+		InCatalog:   sum.InCatalog,
 	}
 	return d
+}
+
+func catalogMemberSet(d *Deps) map[string]struct{} {
+	set := map[string]struct{}{}
+	if d == nil || d.Catalog == nil {
+		return set
+	}
+	zs, err := d.Catalog.ListZones()
+	if err != nil {
+		return set
+	}
+	for _, z := range zs {
+		set[strings.ToLower(normalizeZone(z))] = struct{}{}
+	}
+	return set
+}
+
+func zoneInCatalog(set map[string]struct{}, zone string) bool {
+	_, ok := set[strings.ToLower(normalizeZone(zone))]
+	return ok
 }
 
 type RRsetResponse struct {

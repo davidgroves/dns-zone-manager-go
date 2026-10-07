@@ -71,6 +71,79 @@ func TestRNDCCreateDeleteZone(t *testing.T) {
 	require.NotContains(t, catalogPTRTargets(cat), "managed.test.")
 }
 
+func TestRNDCDeferredCatalogPublish(t *testing.T) {
+	stack := startBINDAPI(t, stackOptions{withStore: true, serveHTTP: true, withRNDC: true})
+	ctx := context.Background()
+
+	code, body := doAPI(t, stack.Handler, http.MethodPost, "/v1/zones", map[string]any{
+		"zone":    "staged.test.",
+		"catalog": false,
+	})
+	require.Equal(t, http.StatusCreated, code, "create: %v", body)
+	require.Equal(t, "staged.test.", body["zone"])
+	_, hasCatalog := body["catalog_added"]
+	require.False(t, hasCatalog)
+
+	require.Eventually(t, func() bool {
+		_, err := stack.Client.QuerySOA(ctx, "staged.test.")
+		return err == nil
+	}, 15*time.Second, 200*time.Millisecond)
+
+	cat, err := stack.Client.PerformAXFR(ctx, "catalog.test.")
+	require.NoError(t, err)
+	require.NotContains(t, catalogPTRTargets(cat), "staged.test.")
+
+	code, body = doAPI(t, stack.Handler, http.MethodPut, "/v1/zones/staged.test./catalog", nil)
+	require.Equal(t, http.StatusOK, code, "publish: %v", body)
+	require.Equal(t, true, body["catalog_added"])
+
+	require.Eventually(t, func() bool {
+		cat, err := stack.Client.PerformAXFR(ctx, "catalog.test.")
+		if err != nil {
+			return false
+		}
+		for _, target := range catalogPTRTargets(cat) {
+			if target == "staged.test." {
+				return true
+			}
+		}
+		return false
+	}, 15*time.Second, 200*time.Millisecond)
+
+	code, list := doAPI(t, stack.Handler, http.MethodGet, "/v1/zones", nil)
+	require.Equal(t, http.StatusOK, code)
+	foundInCatalog := false
+	if zones, ok := list["zones"].([]any); ok {
+		for _, z := range zones {
+			m, _ := z.(map[string]any)
+			if m["zone"] == "staged.test." {
+				foundInCatalog = m["in_catalog"] == true
+			}
+		}
+	}
+	require.True(t, foundInCatalog, "expected in_catalog on list: %v", list)
+
+	code, body = doAPI(t, stack.Handler, http.MethodDelete, "/v1/zones/staged.test./catalog", nil)
+	require.Equal(t, http.StatusOK, code, "unpublish: %v", body)
+	require.Equal(t, true, body["catalog_removed"])
+
+	require.Eventually(t, func() bool {
+		cat, err := stack.Client.PerformAXFR(ctx, "catalog.test.")
+		if err != nil {
+			return false
+		}
+		for _, target := range catalogPTRTargets(cat) {
+			if target == "staged.test." {
+				return false
+			}
+		}
+		return true
+	}, 15*time.Second, 200*time.Millisecond)
+
+	_, err = stack.Client.QuerySOA(ctx, "staged.test.")
+	require.NoError(t, err, "zone should remain on primary after unpublish")
+}
+
 func TestRNDCScheduledCreate(t *testing.T) {
 	stack := startBINDAPI(t, stackOptions{withStore: true, serveHTTP: true, withRNDC: true})
 	at := time.Now().UTC().Add(-time.Second)

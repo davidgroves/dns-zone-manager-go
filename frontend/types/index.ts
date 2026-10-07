@@ -3,7 +3,10 @@
 export interface Zone {
   zone: string;
   from_catalog?: boolean;
+  in_catalog?: boolean;
   record_count?: number;
+  rrset_count?: number;
+  serial?: number;
   zone_is_idn?: boolean;
   zone_utf8?: string | null;
 }
@@ -421,8 +424,11 @@ export interface AppState {
   rndcStatus: RNDCStatus | null;
   showCreateZone: boolean;
   showDeleteZoneConfirm: boolean;
+  showPublishCatalogConfirm: boolean;
+  showUnpublishCatalogConfirm: boolean;
   creatingZone: boolean;
   deletingZone: boolean;
+  catalogMembershipBusy: boolean;
   createZoneForm: CreateZoneForm;
 
   // Record Pagination

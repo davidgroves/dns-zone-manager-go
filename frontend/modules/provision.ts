@@ -96,11 +96,17 @@ export function createProvisionMethods(_state: AppState) {
           return;
         }
         const data = (await response.json()) as { zone?: string; id?: string };
+        const publishedToCatalog = body.catalog !== false;
         this.showCreateZone = false;
         if (body.scheduled_at) {
           this.toast('Zone create scheduled', 'success');
         } else {
-          this.toast('Zone created', 'success');
+          this.toast(
+            publishedToCatalog
+              ? 'Zone created'
+              : 'Zone created on primary only. Publish to catalog when ready.',
+            'success',
+          );
           await this.loadZones();
           await this.loadCatalogStatus();
           if (data.zone) {
@@ -111,6 +117,70 @@ export function createProvisionMethods(_state: AppState) {
         this.toast(`Failed to create zone: ${(e as Error).message}`, 'error');
       } finally {
         this.creatingZone = false;
+      }
+    },
+
+    zoneInCatalog(this: ProvisionContext, zone: string | null | undefined): boolean {
+      if (!zone) return false;
+      const key = zone.toLowerCase();
+      if (this.catalogZones.has(key)) return true;
+      const row = this.zones.find((z) => z.zone.toLowerCase() === key);
+      return row?.in_catalog === true;
+    },
+
+    async publishSelectedZoneToCatalog(this: ProvisionContext) {
+      if (!this.selectedZone) return;
+      this.catalogMembershipBusy = true;
+      try {
+        const response = await api(
+          `${API_BASE}/zones/${encodeURIComponent(this.selectedZone)}/catalog`,
+          this.apiKey,
+          { method: 'PUT' },
+        );
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          this.toast(
+            `Failed to publish to catalog: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`,
+            'error',
+          );
+          return;
+        }
+        this.showPublishCatalogConfirm = false;
+        this.toast('Zone published to catalog', 'success');
+        await this.loadZones();
+        await this.loadCatalogStatus();
+      } catch (e) {
+        this.toast(`Failed to publish to catalog: ${(e as Error).message}`, 'error');
+      } finally {
+        this.catalogMembershipBusy = false;
+      }
+    },
+
+    async unpublishSelectedZoneFromCatalog(this: ProvisionContext) {
+      if (!this.selectedZone) return;
+      this.catalogMembershipBusy = true;
+      try {
+        const response = await api(
+          `${API_BASE}/zones/${encodeURIComponent(this.selectedZone)}/catalog`,
+          this.apiKey,
+          { method: 'DELETE' },
+        );
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          this.toast(
+            `Failed to remove from catalog: ${formatDNSErrorWithRequestID(err, requestIDFromResponse(response))}`,
+            'error',
+          );
+          return;
+        }
+        this.showUnpublishCatalogConfirm = false;
+        this.toast('Zone removed from catalog (still on primary)', 'success');
+        await this.loadZones();
+        await this.loadCatalogStatus();
+      } catch (e) {
+        this.toast(`Failed to remove from catalog: ${(e as Error).message}`, 'error');
+      } finally {
+        this.catalogMembershipBusy = false;
       }
     },
 

@@ -20,9 +20,11 @@ const (
 	StatusExpired   = "expired"
 	StatusReverted  = "reverted"
 
-	KindRecords    = "records"
-	KindZoneCreate = "zone_create"
-	KindZoneDelete = "zone_delete"
+	KindRecords           = "records"
+	KindZoneCreate        = "zone_create"
+	KindZoneDelete        = "zone_delete"
+	KindZoneCatalogAdd    = "zone_catalog_add"
+	KindZoneCatalogRemove = "zone_catalog_remove"
 )
 
 var (

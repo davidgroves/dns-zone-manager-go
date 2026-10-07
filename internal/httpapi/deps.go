@@ -32,6 +32,8 @@ type NotifyStatusProvider interface {
 type ZoneProvisioner interface {
 	CreateZone(ctx context.Context, req provision.CreateRequest) (provision.Result, error)
 	DeleteZone(ctx context.Context, zone string, opts provision.DeleteOptions) (provision.Result, error)
+	AddToCatalog(ctx context.Context, zone string) (provision.Result, error)
+	RemoveFromCatalog(ctx context.Context, zone string) (provision.Result, error)
 	Status(ctx context.Context) provision.Status
 }
 
