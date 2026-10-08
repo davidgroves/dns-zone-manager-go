@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 import {
   applyLiveOperations,
   compareRecords,
-  messageBelongsToZone,
   type LiveOperation,
+  messageBelongsToZone,
   normalizeName,
   recordKey,
 } from '../../modules/live';
@@ -185,9 +185,9 @@ describe('messageBelongsToZone', () => {
   });
 
   it('rejects cross-zone messages that would pollute another zone table', () => {
-    expect(
-      messageBelongsToZone('always-changing.example.', 'beta.test.'),
-    ).toBe(false);
+    expect(messageBelongsToZone('always-changing.example.', 'beta.test.')).toBe(
+      false,
+    );
   });
 
   it('rejects missing zones', () => {

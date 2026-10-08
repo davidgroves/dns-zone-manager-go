@@ -340,10 +340,7 @@ export function createZoneMethods(_state: AppState) {
 
       if (relation !== 'found' && (this.totalRecords || 0) > 0) {
         const pageSize = this.pageSize || 25;
-        const totalPages = Math.max(
-          1,
-          Math.ceil(this.totalRecords / pageSize),
-        );
+        const totalPages = Math.max(1, Math.ceil(this.totalRecords / pageSize));
         let lo = 1;
         let hi = totalPages;
         let found = false;
@@ -398,7 +395,10 @@ export function createZoneMethods(_state: AppState) {
         if (normalizeName(rowName) === normalized) {
           if (!first) first = row;
           row.classList.add('live-flash');
-          window.setTimeout(() => row.classList.remove('live-flash'), SCROLL_HIGHLIGHT_MS);
+          window.setTimeout(
+            () => row.classList.remove('live-flash'),
+            SCROLL_HIGHLIGHT_MS,
+          );
         }
       }
       first?.scrollIntoView({ behavior: 'smooth', block: 'center' });

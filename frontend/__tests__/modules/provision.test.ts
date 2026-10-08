@@ -71,7 +71,10 @@ describe('provision', () => {
         if (init?.method === 'PUT') {
           return {
             ok: true,
-            json: async () => ({ zone: 'staged.example.', catalog_added: true }),
+            json: async () => ({
+              zone: 'staged.example.',
+              catalog_added: true,
+            }),
           };
         }
         return { ok: true, json: async () => ({}) };

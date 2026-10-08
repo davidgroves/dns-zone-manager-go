@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  createZoneMethods,
-  pageRelationForName,
-} from '../../modules/zones';
+import { createZoneMethods, pageRelationForName } from '../../modules/zones';
 import { createInitialState } from '../../state';
 import type { RRset } from '../../types';
 

@@ -120,7 +120,10 @@ export function createProvisionMethods(_state: AppState) {
       }
     },
 
-    zoneInCatalog(this: ProvisionContext, zone: string | null | undefined): boolean {
+    zoneInCatalog(
+      this: ProvisionContext,
+      zone: string | null | undefined,
+    ): boolean {
       if (!zone) return false;
       const key = zone.toLowerCase();
       if (this.catalogZones.has(key)) return true;
@@ -150,7 +153,10 @@ export function createProvisionMethods(_state: AppState) {
         await this.loadZones();
         await this.loadCatalogStatus();
       } catch (e) {
-        this.toast(`Failed to publish to catalog: ${(e as Error).message}`, 'error');
+        this.toast(
+          `Failed to publish to catalog: ${(e as Error).message}`,
+          'error',
+        );
       } finally {
         this.catalogMembershipBusy = false;
       }
@@ -178,7 +184,10 @@ export function createProvisionMethods(_state: AppState) {
         await this.loadZones();
         await this.loadCatalogStatus();
       } catch (e) {
-        this.toast(`Failed to remove from catalog: ${(e as Error).message}`, 'error');
+        this.toast(
+          `Failed to remove from catalog: ${(e as Error).message}`,
+          'error',
+        );
       } finally {
         this.catalogMembershipBusy = false;
       }
