@@ -83,6 +83,7 @@ export function createInitialState(config: AppConfig): AppState {
     searchResults: [],
     isSearching: false,
     searchAllZones: false,
+    focusName: null,
 
     // Search Pagination
     searchPageSizeMode: 'auto',

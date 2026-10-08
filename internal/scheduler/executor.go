@@ -42,6 +42,9 @@ type ExecuteOpts struct {
 	Trigger      string
 	Log          *slog.Logger
 	Provisioner  ZoneProvisioner
+	// BroadcastLive, when set, pushes applied RRset ops to live WebSocket clients.
+	// Preferred over waiting for NOTIFY→IXFR after optimistic cache updates.
+	BroadcastLive func(zone string, ops []dnsx.Operation)
 }
 
 // ExecuteChange builds and sends the DDNS UPDATE for a claimed scheduled change.
@@ -176,6 +179,10 @@ func ExecuteChange(
 				metrics.IncRRsetReplaces(zone)
 			}
 		}
+	}
+
+	if opts.BroadcastLive != nil {
+		opts.BroadcastLive(zone, dnsx.OperationsFromCacheUpdates(built.CacheUpdates))
 	}
 
 	var newSerial *int64

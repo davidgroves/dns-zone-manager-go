@@ -95,6 +95,7 @@ func registerAtomic(api huma.API, d *Deps) {
 		if cz.Zone != nil {
 			_ = dnsx.ApplyCacheUpdates(cz.Zone, built.CacheUpdates)
 		}
+		d.broadcastLiveOps(zone, "api", dnsx.OperationsFromCacheUpdates(built.CacheUpdates))
 		return &struct{ Body map[string]any }{Body: map[string]any{
 			"success":          true,
 			"zone":             zone,

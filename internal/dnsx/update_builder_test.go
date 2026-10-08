@@ -219,3 +219,19 @@ func TestApplyCacheUpdates(t *testing.T) {
 		t.Fatalf("got %+v ok=%v", info, ok)
 	}
 }
+
+func TestOperationsFromCacheUpdates(t *testing.T) {
+	ops := OperationsFromCacheUpdates([]CacheUpdate{
+		{Action: "Replace", Name: "both-1.always-changing.example.", RdType: "a", Class: "", TTL: 60, Records: []string{"203.0.113.1"}},
+		{Action: "delete", Name: "gone.example.", RdType: "TXT", Class: "in", Records: []string{"x"}},
+	})
+	if len(ops) != 2 {
+		t.Fatalf("len=%d", len(ops))
+	}
+	if ops[0].Action != "replace" || ops[0].Type != "A" || ops[0].Class != "IN" || ops[0].TTL != 60 {
+		t.Fatalf("op0=%+v", ops[0])
+	}
+	if ops[1].Action != "delete" || ops[1].Type != "TXT" || ops[1].Class != "IN" {
+		t.Fatalf("op1=%+v", ops[1])
+	}
+}

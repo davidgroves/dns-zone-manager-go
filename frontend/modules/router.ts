@@ -10,6 +10,7 @@ export const URL_PARAMS = {
   type: 'type',
   field: 'field',
   allZones: 'all',
+  focus: 'focus',
   view: 'view',
   change: 'change',
 } as const;
@@ -27,6 +28,7 @@ export function parseSearchString(searchString: string): RouteParams {
   const type = params.get(URL_PARAMS.type);
   const field = params.get(URL_PARAMS.field) as SearchField | null;
   const allZones = params.get(URL_PARAMS.allZones) === 'true';
+  const focus = params.get(URL_PARAMS.focus);
   const view = params.get(URL_PARAMS.view);
   const change = params.get(URL_PARAMS.change);
 
@@ -39,6 +41,7 @@ export function parseSearchString(searchString: string): RouteParams {
     searchType: type || null,
     searchField: field || 'either',
     searchAllZones: allZones,
+    focus: focus || null,
     view: view || null,
     change: change || null,
   };
@@ -81,6 +84,10 @@ export function buildQueryString(params: Partial<RouteParams>): string {
 
   if (params.searchAllZones) {
     urlParams.set(URL_PARAMS.allZones, 'true');
+  }
+
+  if (params.focus) {
+    urlParams.set(URL_PARAMS.focus, params.focus);
   }
 
   if (params.view) {
@@ -135,6 +142,7 @@ export function getRouteParamsFromState(state: AppState): RouteParams {
     searchType: state.searchType || null,
     searchField: state.searchField,
     searchAllZones: state.searchAllZones,
+    focus: state.focusName,
     view: state.showAuditView
       ? 'audit'
       : state.showScheduledView
@@ -167,6 +175,7 @@ type RouterMethodContext = AppState & {
   goToRecordPage: (page: number) => Promise<void>;
   goToSearchPage: (page: number) => Promise<void>;
   clearSearch: () => void;
+  focusNameInZone: (name: string) => Promise<boolean>;
   toast: (message: string, type?: 'success' | 'error' | 'warning') => void;
   openScheduledView: () => void;
   openAuditView: () => void;
@@ -234,8 +243,10 @@ export function createRouterMethods(_state: AppState) {
         await this.loadZones();
         await this.selectZone(route.zone);
 
-        // Navigate to specific page if requested
-        if (route.page && route.page > 1) {
+        if (route.focus) {
+          this.focusName = route.focus;
+          await this.focusNameInZone(route.focus);
+        } else if (route.page && route.page > 1) {
           await this.goToRecordPage(route.page);
         }
       } else {
@@ -270,6 +281,7 @@ export function createRouterMethods(_state: AppState) {
       this.disconnectZoneLive();
       this.selectedZone = null;
       this.records = [];
+      this.focusName = null;
       this.showScheduledView = false;
       this.showAuditView = false;
       this.selectedScheduledChange = null;

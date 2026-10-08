@@ -31,6 +31,17 @@ export function normalizeName(name: string): string {
   return n.endsWith('.') ? n : `${n}.`;
 }
 
+/** True when a live message targets the zone currently shown in the UI. */
+export function messageBelongsToZone(
+  messageZone: string | undefined,
+  selectedZone: string | null | undefined,
+): boolean {
+  if (!messageZone || !selectedZone) {
+    return false;
+  }
+  return normalizeName(messageZone) === normalizeName(selectedZone);
+}
+
 export function recordKey(
   name: string,
   type: string,
@@ -257,6 +268,10 @@ export function createLiveMethods(_state: AppState) {
         return;
       }
       if (!this.selectedZone) return;
+      // Drop cross-zone events (e.g. stale WS frames after switching zones).
+      if (!messageBelongsToZone(message.zone, this.selectedZone)) {
+        return;
+      }
 
       if (message.type === 'zone_reload') {
         void this.loadRecords(this.currentCursor, false);
@@ -318,6 +333,11 @@ export function createLiveMethods(_state: AppState) {
         activeSocket = ws;
 
         ws.onmessage = (event) => {
+          // Ignore frames from a socket that is no longer the active subscription
+          // (zone switch / reconnect can leave a closing socket delivering events).
+          if (activeSocket !== ws || activeZone !== normalized) {
+            return;
+          }
           try {
             const message = JSON.parse(String(event.data)) as LiveMessage;
             if (message.type === 'subscribed' || message.type === 'pong') {

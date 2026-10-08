@@ -4,8 +4,9 @@ Work on this tree **inside the Dev Container**. The workspace is
 `.devcontainer/`: a Compose project with the `dev` service (Go, Node, DNS
 tools, Docker socket), sibling **BIND** (`bind:15353`), **PostgreSQL**
 (tmpfs; schema is created when the API starts), optional **LGTM**
-(Grafana / Loki / Prometheus / Tempo), and an optional **Traefik +
-oauth2-proxy + Entra emulator** OIDC front door.
+(Grafana / Loki / Prometheus / Tempo), an optional **Traefik +
+oauth2-proxy + Entra emulator** OIDC front door, and an optional
+**webhook-mocker** Teams/Slack incoming-webhook sink.
 
 In Cursor or VS Code: clone the repo, install the Dev Containers extension,
 then **Reopen in Container**. First create runs `npm install`, `go mod
@@ -45,11 +46,13 @@ The API does **not** start with the container. Use **Tasks** after attach:
   follow. BACKEND builds the SPA into `dist/` then
   `go run … serve --config .devcontainer/config.devcontainer.yaml --ui-dir dist`.
 - **Run All (Complete)** — the same, plus **ZONE CHURN**, **LGTM**, **ENTRA**
-  (local Entra ID emulator), and **TRAEFIK** (oauth2-proxy + Traefik).
+  (local Entra ID emulator), **TRAEFIK** (oauth2-proxy + Traefik), and
+  **WEBHOOKS** (Teams/Slack webhook-mocker).
 
 Open **http://localhost:8000** for the API and the UI (API key `dev`). With
-Complete, Grafana is **http://localhost:3000** and the OIDC front door is
-**http://localhost:8080**. Stop tasks with **Terminal: Kill All Terminals**.
+Complete, Grafana is **http://localhost:3000**, the OIDC front door is
+**http://localhost:8080**, and webhook-mocker is **http://localhost:5080**.
+Stop tasks with **Terminal: Kill All Terminals**.
 
 BIND and Postgres are already Compose services; those tasks mainly attach to
 logs. BACKEND is the process you restart after Go changes.
@@ -66,8 +69,26 @@ fixture in [`.devcontainer/entra/`](.devcontainer/entra/) seeds users and apps.
 | http://localhost:8080 | Same app via Traefik (OIDC: “Sign in with Entra ID” then IdP) |
 | http://localhost:8081 | Traefik dashboard |
 | http://localhost:8444 | Entra emulator (OIDC issuer; dark sign-in via themeproxy) |
+| http://localhost:5080 | webhook-mocker UI (Teams Adaptive Cards from DNS changes) |
 
 Dummy users: `user1@dns-zone-manager.test` / `pass1` (also user2/pass2, user3/pass3).
+
+## Teams webhooks (webhook-mocker)
+
+Dev config enables outbound `type: teams` notifications to a local
+[webhook-mocker](https://github.com/davidgroves/webhook-mocker) sink (fixture in
+[`.devcontainer/webhook-mocker/`](.devcontainer/webhook-mocker/)). Start the
+**WEBHOOKS** task (or **Run All (Complete)**), make a DNS change, then open
+**http://localhost:5080** and the **dns** virtual channel.
+
+```text
+POST http://localhost:5080/teams/workflows/dns-dev   ← teams-dns target
+```
+
+`webhook-mocker` shares the `dev` network namespace (like Entra), so the API and
+browser both use `localhost:5080`. Publishing that port on `dev` needs a
+**one-time Rebuild Container** after pulling this change if `:5080` is not
+already mapped.
 
 ```bash
 # After ENTRA + TRAEFIK + BACKEND are up:

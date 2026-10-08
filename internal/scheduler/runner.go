@@ -28,6 +28,9 @@ func leaseOwnerID() string {
 //
 // Retention runs only on idle ticks (no due change claimed) so a vacuum never
 // delays applying a scheduled change.
+//
+// broadcastLive, when non-nil, is invoked after successful record applies so
+// WebSocket clients get ops without waiting on NOTIFY→IXFR.
 func RunLoop(
 	ctx context.Context,
 	st *store.Store,
@@ -36,6 +39,7 @@ func RunLoop(
 	schedSettings config.SchedulerSettings,
 	retentionSettings config.RetentionSettings,
 	prov ZoneProvisioner,
+	broadcastLive func(zone string, ops []dnsx.Operation),
 ) {
 	owner := leaseOwnerID()
 	pollInterval := schedSettings.PollInterval
@@ -103,11 +107,12 @@ func RunLoop(
 				)
 
 				result := ExecuteChange(ctx, change, st, client, cache, ExecuteOpts{
-					MaxAttempts:  schedSettings.MaxAttempts,
-					RetryBackoff: schedSettings.RetryBackoff,
-					Actor:        &owner,
-					Trigger:      notifications.TriggerScheduler,
-					Provisioner:  prov,
+					MaxAttempts:   schedSettings.MaxAttempts,
+					RetryBackoff:  schedSettings.RetryBackoff,
+					Actor:         &owner,
+					Trigger:       notifications.TriggerScheduler,
+					Provisioner:   prov,
+					BroadcastLive: broadcastLive,
 				})
 
 				if result.Success {

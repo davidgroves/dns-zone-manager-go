@@ -456,6 +456,8 @@ export interface AppState {
   searchResults: SearchResultZone[];
   isSearching: boolean;
   searchAllZones: boolean;
+  /** FQDN to highlight/scroll to after opening a zone (from search or ?focus=). */
+  focusName: string | null;
 
   // Search Pagination
   searchPageSizeMode: PageSizeMode;
@@ -598,6 +600,8 @@ export interface RouteParams {
   searchType: string | null;
   searchField: SearchField;
   searchAllZones: boolean;
+  /** FQDN to scroll/highlight within the selected zone */
+  focus: string | null;
   view: string | null;
   /** Selected scheduled change id when view=scheduled */
   change: string | null;

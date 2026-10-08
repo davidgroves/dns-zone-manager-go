@@ -6,11 +6,27 @@ import (
 	"time"
 
 	"github.com/davidgroves/dns-zone-manager-go/internal/dnsx"
+	"github.com/davidgroves/dns-zone-manager-go/internal/live"
 	"github.com/davidgroves/dns-zone-manager-go/internal/store"
 )
 
 func normalizeZone(zone string) string {
 	return dnsx.NormalizeZoneName(zone)
+}
+
+// broadcastLiveOps pushes applied RRset operations to live WebSocket subscribers.
+func (d *Deps) broadcastLiveOps(zone, trigger string, ops []dnsx.Operation) {
+	if d == nil || d.Hub == nil || len(ops) == 0 {
+		return
+	}
+	var serial *uint32
+	if d.Cache != nil {
+		if cz := d.Cache.PeekZone(zone); cz != nil {
+			s := cz.Serial
+			serial = &s
+		}
+	}
+	live.BroadcastApplied(d.Hub, zone, trigger, ops, serial)
 }
 
 // PaginatedZones is the list-zones response.

@@ -602,3 +602,50 @@ func TestAddZoneCatalogRequiresRNDC(t *testing.T) {
 		t.Fatalf("got %d %s", rr.Code, rr.Body.String())
 	}
 }
+
+type fakeCatalogIndexer struct {
+	zones []string
+}
+
+func (f *fakeCatalogIndexer) Connected() bool              { return true }
+func (f *fakeCatalogIndexer) ZoneName() string             { return "catalog.test." }
+func (f *fakeCatalogIndexer) Serial() (uint32, bool)       { return 1, true }
+func (f *fakeCatalogIndexer) ListZones() ([]string, error) { return f.zones, nil }
+func (f *fakeCatalogIndexer) PollInterval() float64        { return 60 }
+
+func TestListZonesIncludesInCatalog(t *testing.T) {
+	settings := testSettings()
+	backend := newFakeBackend()
+	backend.seed("cataloged.example.", 1)
+	backend.seed("local.example.", 1)
+	cache := dnsx.NewCacheWithBackend(settings, backend)
+	if _, err := cache.LoadZone(context.Background(), "cataloged.example."); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if _, err := cache.LoadZone(context.Background(), "local.example."); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	h := httpapi.New(httpapi.Deps{
+		Settings:   settings,
+		Auth:       auth.NewCombined(settings),
+		Cache:      cache,
+		Catalog:    &fakeCatalogIndexer{zones: []string{"cataloged.example."}},
+		DNSReady:   func(context.Context) bool { return true },
+		StoreReady: func(context.Context) bool { return true },
+	})
+	code, body, _ := doJSON(t, h, http.MethodGet, "/v1/zones")
+	if code != http.StatusOK {
+		t.Fatalf("status %d %v", code, body)
+	}
+	zones, _ := body["zones"].([]any)
+	got := map[string]bool{}
+	for _, z := range zones {
+		m, _ := z.(map[string]any)
+		name, _ := m["zone"].(string)
+		in, _ := m["in_catalog"].(bool)
+		got[name] = in
+	}
+	if !got["cataloged.example."] || got["local.example."] {
+		t.Fatalf("in_catalog map=%v", got)
+	}
+}

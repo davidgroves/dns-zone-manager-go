@@ -133,6 +133,9 @@ func registerReverse(api huma.API, d *Deps) {
 				if d.Cache != nil {
 					d.Cache.UpdateCacheAfterAdd(revZone, ptrFQDN, ttl, "PTR", "IN", []string{target})
 				}
+				d.broadcastLiveOps(revZone, "api", []dnsx.Operation{{
+					Action: "add", Name: ptrFQDN, Type: "PTR", Class: "IN", TTL: ttl, Records: []string{target},
+				}})
 				created++
 			case "replace":
 				m, err := d.Client.PrepareReplace(revZone, ptrFQDN, ttl, "PTR", "IN", []string{target}, existing)
@@ -159,6 +162,9 @@ func registerReverse(api huma.API, d *Deps) {
 				if d.Cache != nil {
 					d.Cache.UpdateCacheAfterReplace(revZone, ptrFQDN, ttl, "PTR", "IN", []string{target})
 				}
+				d.broadcastLiveOps(revZone, "api", []dnsx.Operation{{
+					Action: "replace", Name: ptrFQDN, Type: "PTR", Class: "IN", TTL: ttl, Records: []string{target},
+				}})
 				status, msg = "replaced", "PTR replaced"
 				created++
 			case "add_roundrobin":
@@ -182,6 +188,9 @@ func registerReverse(api huma.API, d *Deps) {
 				if d.Cache != nil {
 					d.Cache.UpdateCacheAfterAdd(revZone, ptrFQDN, ttl, "PTR", "IN", []string{target})
 				}
+				d.broadcastLiveOps(revZone, "api", []dnsx.Operation{{
+					Action: "add", Name: ptrFQDN, Type: "PTR", Class: "IN", TTL: ttl, Records: []string{target},
+				}})
 				status, msg = "added", "PTR added"
 				created++
 			}

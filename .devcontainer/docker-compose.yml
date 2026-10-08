@@ -1,7 +1,8 @@
 # DNS Zone Manager Devcontainer Environment
 # Provides a development container, a BIND DNS server, PostgreSQL,
-# Grafana LGTM (Loki + Grafana + Tempo + Prometheus), and an optional
-# Traefik + oauth2-proxy + Entra-emulator auth front door.
+# Grafana LGTM (Loki + Grafana + Tempo + Prometheus), an optional
+# Traefik + oauth2-proxy + Entra-emulator auth front door, and an optional
+# webhook-mocker (Teams/Slack incoming-webhook sink).
 #
 # No static IPs/subnet are used. BIND's also-notify directive requires an IP
 # address (it does not support hostnames), so the BIND entrypoint resolves the
@@ -16,6 +17,8 @@
 #     http://localhost:8444/... is the same URL for the host browser, dns-cli
 #     inside the container, and oauth2-proxy. Start them via the ENTRA /
 #     TRAEFIK VS Code tasks (not runServices).
+#   webhook-mocker:
+#     Teams/Slack webhook sink on :5080 (WEBHOOKS task; not runServices).
 
 services:
   # Development container - VS Code/Cursor connects here
@@ -47,6 +50,7 @@ services:
       - "8080:8080"   # Traefik (OIDC front door)
       - "8081:8081"   # Traefik dashboard
       - "8444:8444"   # Entra ID emulator (OIDC issuer)
+      - "5080:5080"   # webhook-mocker UI (when WEBHOOKS task is running)
     # Enable host.docker.internal on Linux (automatic on Docker Desktop)
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -187,7 +191,10 @@ services:
           sleep 1
         done
         set -e
+        # Re-seed from source and drop journals so prior DDNS (e.g. old both-1/2/3)
+        # cannot resurrect names removed from the seed files.
         cp /etc/bind/zones-source/* /var/lib/bind/
+        rm -f /var/lib/bind/*.jnl
         chmod 666 /var/lib/bind/*
         mkdir -p /perf-zones /managed-zones
         chmod 777 /perf-zones /managed-zones
@@ -299,6 +306,22 @@ services:
     networks:
       - devnet
 
+  # Local Slack / Microsoft Teams incoming-webhook mocker (virtual-channel UI).
+  # Shares the `dev` network namespace so the API and browser both use
+  # http://localhost:5080 (port published on `dev`; same pattern as entra).
+  # Start via the WEBHOOKS VS Code task (not runServices).
+  webhook-mocker:
+    image: ghcr.io/davidgroves/webhook-mocker@sha256:e5666d9215cd92e95dc326bc890ea40066ba23201393c74bae1645f76a1853dc
+    network_mode: "container:${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}-dev-1"
+    environment:
+      - TZ=UTC
+      - WM_PUBLIC_URL=http://localhost:5080
+    configs:
+      - source: webhook_mocker_config
+        target: /etc/webhook-mocker.yaml
+    command: ["--config", "/etc/webhook-mocker.yaml"]
+    restart: unless-stopped
+
   # Grafana LGTM (Loki + Grafana + Tempo + Prometheus/Mimir + OTel Collector).
   # Scrapes /metrics from the API in the `dev` container; receives OTLP logs on :4318.
   lgtm:
@@ -306,6 +329,10 @@ services:
     hostname: lgtm
     environment:
       - TZ=UTC
+      # Local dev only: open the UI with no login (anonymous Admin).
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
       - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/otel-lgtm/grafana/conf/provisioning/dashboards/custom/dns-zone-manager.json
     ports:
       - "3000:3000"   # Grafana UI
@@ -343,6 +370,22 @@ volumes:
 # the dev container). ForwardAuth targets localhost because Traefik shares
 # the `dev` network namespace with oauth2-proxy and the API process.
 configs:
+  # Inlined (same reason as traefik_dynamic / BIND docker-cp): host-path
+  # binds resolve on the Docker daemon host, not inside `dev`. Keep in sync
+  # with .devcontainer/webhook-mocker/webhook-mocker.yaml.
+  webhook_mocker_config:
+    content: |
+      listen: 0.0.0.0:5080
+      public_url: http://localhost:5080
+      channels:
+        - kind: teams
+          name: dns
+          token: dns-dev
+      strict: false
+      auto_create: true
+      max_messages: 500
+      max_body: 1048576
+      json_logs: true
   traefik_dynamic:
     content: |
       http:

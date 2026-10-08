@@ -233,6 +233,15 @@ func mutateRRset(ctx context.Context, d *Deps, action, zone string, body struct 
 	var updateMsg interface{}
 	_ = updateMsg
 
+	liveOp := dnsx.Operation{
+		Action:  action,
+		Name:    fqdn,
+		Type:    rdtype,
+		Class:   strings.ToUpper(rdclass),
+		TTL:     ttl,
+		Records: body.Records,
+	}
+
 	switch action {
 	case "add":
 		// Cache existence check
@@ -281,6 +290,7 @@ func mutateRRset(ctx context.Context, d *Deps, action, zone string, body struct 
 		d.Cache.UpdateCacheAfterReplace(zone, fqdn, ttl, rdtype, rdclass, body.Records)
 		metrics.IncRRsetReplaces(zone)
 	}
+	d.broadcastLiveOps(zone, "api", []dnsx.Operation{liveOp})
 
 	out := map[string]any{"success": true, "message": "RRset " + action + " succeeded"}
 	if action != "delete" {

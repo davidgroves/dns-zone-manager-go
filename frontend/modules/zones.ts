@@ -6,7 +6,33 @@ import {
 } from '../api/client';
 import type { AppState, CatalogStatus, PageSizeMode, Zone } from '../types';
 import { calculateZonePageSize, getPageSizeForMode } from '../utils/pagination';
-import { syncUrlFromState } from './router';
+import { normalizeName } from './live';
+import { buildQueryString, syncUrlFromState } from './router';
+
+const SCROLL_HIGHLIGHT_MS = 1200;
+
+/** Where a target name sits relative to the current server-ordered page. */
+export type PageRelation = 'found' | 'before' | 'after' | 'absent' | 'empty';
+
+/**
+ * Compare a focus name to the current page of records (server order: name asc).
+ * Exported for unit tests.
+ */
+export function pageRelationForName(
+  records: { name: string }[],
+  target: string,
+): PageRelation {
+  if (!records.length) return 'empty';
+  const normalized = normalizeName(target);
+  if (records.some((r) => normalizeName(r.name) === normalized)) {
+    return 'found';
+  }
+  const first = normalizeName(records[0].name);
+  const last = normalizeName(records[records.length - 1].name);
+  if (normalized < first) return 'before';
+  if (normalized > last) return 'after';
+  return 'absent';
+}
 
 // Method context type - includes state and other methods
 type ZoneMethodContext = AppState & {
@@ -22,8 +48,12 @@ type ZoneMethodContext = AppState & {
   selectZone: (zone: string) => Promise<void>;
   loadZonesFirstPage: () => Promise<void>;
   loadZonesWithOffset: (offset: number) => Promise<void>;
+  goToRecordPage: (page: number) => Promise<void>;
+  focusNameInZone: (name: string) => Promise<boolean>;
+  scrollToFocusName: () => void;
   connectZoneLive: (zone: string) => void;
   disconnectZoneLive: () => void;
+  $nextTick?: (fn?: () => void) => Promise<void>;
 };
 
 /**
@@ -266,6 +296,7 @@ export function createZoneMethods(_state: AppState) {
     async selectZone(this: ZoneMethodContext, zone: string) {
       this.disconnectZoneLive();
       this.selectedZone = zone;
+      this.focusName = null;
       this.showScheduledView = false;
       this.showAuditView = false;
       this.clearSearch();
@@ -273,6 +304,104 @@ export function createZoneMethods(_state: AppState) {
       // Update URL to reflect selected zone
       syncUrlFromState(this);
       this.connectZoneLive(zone);
+    },
+
+    /**
+     * Build a deep-link href to a zone focused on a specific name.
+     */
+    zoneNameHref(this: ZoneMethodContext, zone: string, name: string): string {
+      return buildQueryString({
+        zone,
+        focus: normalizeName(name),
+      });
+    },
+
+    /**
+     * From all-zones search: open the zone and scroll to the given name.
+     */
+    async goToZoneName(this: ZoneMethodContext, zone: string, name: string) {
+      const target = normalizeName(name);
+      await this.selectZone(zone);
+      this.focusName = target;
+      await this.focusNameInZone(target);
+      syncUrlFromState(this);
+    },
+
+    /**
+     * Ensure the page containing `name` is loaded, then scroll/highlight it.
+     * Returns true if the name was found in the zone.
+     */
+    async focusNameInZone(
+      this: ZoneMethodContext,
+      name: string,
+    ): Promise<boolean> {
+      const target = normalizeName(name);
+      let relation = pageRelationForName(this.records || [], target);
+
+      if (relation !== 'found' && (this.totalRecords || 0) > 0) {
+        const pageSize = this.pageSize || 25;
+        const totalPages = Math.max(
+          1,
+          Math.ceil(this.totalRecords / pageSize),
+        );
+        let lo = 1;
+        let hi = totalPages;
+        let found = false;
+
+        while (lo <= hi) {
+          const mid = Math.floor((lo + hi) / 2);
+          await this.goToRecordPage(mid);
+          relation = pageRelationForName(this.records || [], target);
+          if (relation === 'found') {
+            found = true;
+            break;
+          }
+          if (relation === 'before') {
+            hi = mid - 1;
+          } else if (relation === 'after') {
+            lo = mid + 1;
+          } else {
+            // absent or empty — stop searching
+            break;
+          }
+        }
+
+        if (!found) {
+          return false;
+        }
+      } else if (relation !== 'found') {
+        return false;
+      }
+
+      const scroll = () => this.scrollToFocusName();
+      if (typeof this.$nextTick === 'function') {
+        await this.$nextTick();
+        scroll();
+      } else {
+        requestAnimationFrame(() => requestAnimationFrame(scroll));
+      }
+      return true;
+    },
+
+    /**
+     * Scroll the focused name into view and briefly highlight matching rows.
+     */
+    scrollToFocusName(this: ZoneMethodContext) {
+      const target = this.focusName;
+      if (!target) return;
+
+      const normalized = normalizeName(target);
+      const rows = document.querySelectorAll<HTMLElement>('[data-rrset-name]');
+      let first: HTMLElement | null = null;
+      for (const row of rows) {
+        const rowName = row.getAttribute('data-rrset-name') || '';
+        if (normalizeName(rowName) === normalized) {
+          if (!first) first = row;
+          row.classList.add('live-flash');
+          window.setTimeout(() => row.classList.remove('live-flash'), SCROLL_HIGHLIGHT_MS);
+        }
+      }
+      first?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     },
 
     /**

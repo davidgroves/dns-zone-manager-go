@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyLiveOperations,
   compareRecords,
+  messageBelongsToZone,
   type LiveOperation,
   normalizeName,
   recordKey,
@@ -174,5 +175,23 @@ describe('live compareRecords', () => {
       'asc',
     );
     expect(cmp).toBeGreaterThan(0);
+  });
+});
+
+describe('messageBelongsToZone', () => {
+  it('accepts matching zones with or without trailing dot', () => {
+    expect(messageBelongsToZone('beta.test.', 'beta.test')).toBe(true);
+    expect(messageBelongsToZone('Beta.Test', 'beta.test.')).toBe(true);
+  });
+
+  it('rejects cross-zone messages that would pollute another zone table', () => {
+    expect(
+      messageBelongsToZone('always-changing.example.', 'beta.test.'),
+    ).toBe(false);
+  });
+
+  it('rejects missing zones', () => {
+    expect(messageBelongsToZone(undefined, 'beta.test.')).toBe(false);
+    expect(messageBelongsToZone('beta.test.', null)).toBe(false);
   });
 });

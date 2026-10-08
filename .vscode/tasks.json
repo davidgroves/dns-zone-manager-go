@@ -42,7 +42,7 @@
     {
       "label": "BIND",
       "type": "shell",
-      "command": "proj=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; bind=\"${proj}-bind-1\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" up -d bind && sudo docker exec \"$bind\" mkdir -p /etc/bind/zones-source && sudo docker cp /workspace/.devcontainer/named.conf.devcontainer \"${bind}:/etc/bind/named.conf\" && sudo docker cp /workspace/examples/bind/zones/. \"${bind}:/etc/bind/zones-source/\" && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" logs --tail 100 -f bind",
+      "command": "proj=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; bind=\"${proj}-bind-1\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" up -d bind && sudo docker exec \"$bind\" mkdir -p /etc/bind/zones-source && sudo docker cp /workspace/.devcontainer/named.conf.devcontainer \"${bind}:/etc/bind/named.conf\" && sudo docker cp /workspace/examples/bind/zones/. \"${bind}:/etc/bind/zones-source/\" && sudo docker exec \"$bind\" sh -c 'cp /etc/bind/zones-source/* /var/lib/bind/ && rm -f /var/lib/bind/*.jnl && chmod 666 /var/lib/bind/* && chown -R bind:bind /var/lib/bind && if rndc -c /var/lib/bind/rndc-internal.conf status >/dev/null 2>&1; then rndc -c /var/lib/bind/rndc-internal.conf reload; fi' && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$proj\" logs --tail 100 -f bind",
       "group": "build",
       "presentation": {
         "reveal": "always",
@@ -97,6 +97,21 @@
       "label": "TRAEFIK",
       "type": "shell",
       "command": "export COMPOSE_PROJECT_NAME=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; until curl -sf http://127.0.0.1:8444/health >/dev/null 2>&1; do echo 'Waiting for Entra emulator (start the ENTRA task if it is not running)...'; sleep 2; done && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$COMPOSE_PROJECT_NAME\" create oauth2-proxy >/dev/null && VOL=\"${COMPOSE_PROJECT_NAME}_oauth2-templates\" && SEED=$(sudo docker create -v \"$VOL:/templates\" alpine:3.20) && sudo docker cp .devcontainer/oauth2-proxy/sign_in.html \"$SEED:/templates/sign_in.html\" && sudo docker cp .devcontainer/oauth2-proxy/error.html \"$SEED:/templates/error.html\" && sudo docker cp .devcontainer/oauth2-proxy/robots.txt \"$SEED:/templates/robots.txt\" && sudo docker rm \"$SEED\" >/dev/null && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$COMPOSE_PROJECT_NAME\" up -d --force-recreate oauth2-proxy traefik && echo && echo 'App (OIDC):       http://localhost:8080' && echo 'Traefik dashboard: http://localhost:8081' && echo 'dns-cli auth login --url http://localhost:8080' && echo '  (user1@dns-zone-manager.test / pass1)' && echo && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$COMPOSE_PROJECT_NAME\" logs --tail 100 -f traefik oauth2-proxy",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "isBackground": true,
+      "runOptions": {
+        "instanceLimit": 1
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "WEBHOOKS",
+      "type": "shell",
+      "command": "export COMPOSE_PROJECT_NAME=\"${COMPOSE_PROJECT_NAME:-dns-zone-manager-go_devcontainer}\"; sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$COMPOSE_PROJECT_NAME\" up -d --force-recreate webhook-mocker && echo 'Waiting for webhook-mocker on :5080…' && until curl -sf http://127.0.0.1:5080/healthz >/dev/null; do sleep 1; done && echo && echo 'webhook-mocker UI:  http://localhost:5080' && echo 'Teams sink:        POST http://localhost:5080/teams/workflows/dns-dev' && echo '  (dev config target teams-dns → Adaptive Cards appear in the dns channel)' && echo && sudo docker compose -f .devcontainer/docker-compose.yml --project-name \"$COMPOSE_PROJECT_NAME\" logs --tail 100 -f webhook-mocker",
       "group": "build",
       "presentation": {
         "reveal": "always",
@@ -168,7 +183,7 @@
     },
     {
       "label": "Run All (Complete)",
-      "dependsOn": ["BACKEND", "BIND", "POSTGRES", "ZONE CHURN", "LGTM", "ENTRA", "TRAEFIK"],
+      "dependsOn": ["BACKEND", "BIND", "POSTGRES", "ZONE CHURN", "LGTM", "ENTRA", "TRAEFIK", "WEBHOOKS"],
       "dependsOrder": "parallel",
       "group": "build",
       "problemMatcher": []

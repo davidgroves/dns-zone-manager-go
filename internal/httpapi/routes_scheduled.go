@@ -291,6 +291,9 @@ func registerScheduled(api huma.API, d *Deps) {
 		result := scheduler.ExecuteChange(ctx, ch, d.Store, d.Client, d.Cache, scheduler.ExecuteOpts{
 			MaxAttempts: d.Settings.Scheduler.MaxAttempts, RetryBackoff: d.Settings.Scheduler.RetryBackoff,
 			Actor: actorPtr(u.ID), Trigger: notifications.TriggerManual, Provisioner: d.Provisioner,
+			BroadcastLive: func(zone string, ops []dnsx.Operation) {
+				d.broadcastLiveOps(zone, notifications.TriggerManual, ops)
+			},
 		})
 		status := store.StatusApplied
 		if !result.Success {

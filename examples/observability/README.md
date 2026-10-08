@@ -16,4 +16,4 @@
 # Logs: set logging.otlp_endpoint (or OTEL_EXPORTER_OTLP_ENDPOINT) on the API
 # so structured logs are exported over OTLP HTTP → collector → Loki.
 #
-# Grafana UI: http://localhost:3000
+# Grafana UI: http://localhost:3000 (anonymous Admin; no login)

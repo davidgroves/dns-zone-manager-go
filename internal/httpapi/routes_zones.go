@@ -133,7 +133,7 @@ func registerZones(api huma.API, mux *http.ServeMux, d *Deps) {
 				return
 			}
 		}
-		text := "$ORIGIN " + zone + "\n" + cz.Zone.ToText()
+		text := cz.Zone.ToText()
 		filename := dnsx.SanitizeZoneFilename(zone) + ".zone"
 		w.Header().Set("Content-Type", "text/dns")
 		w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)

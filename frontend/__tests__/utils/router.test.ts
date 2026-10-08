@@ -13,6 +13,7 @@ describe('URL_PARAMS', () => {
     expect(URL_PARAMS.type).toBe('type');
     expect(URL_PARAMS.field).toBe('field');
     expect(URL_PARAMS.allZones).toBe('all');
+    expect(URL_PARAMS.focus).toBe('focus');
     expect(URL_PARAMS.view).toBe('view');
     expect(URL_PARAMS.change).toBe('change');
   });
@@ -29,6 +30,7 @@ describe('parseSearchString', () => {
       searchType: null,
       searchField: 'either',
       searchAllZones: false,
+      focus: null,
       view: null,
       change: null,
     });
@@ -124,6 +126,7 @@ describe('parseSearchString', () => {
       searchType: 'A',
       searchField: 'name',
       searchAllZones: false,
+      focus: null,
       view: null,
       change: null,
     });
@@ -139,9 +142,19 @@ describe('parseSearchString', () => {
       searchType: 'MX',
       searchField: 'data',
       searchAllZones: true,
+      focus: null,
       view: null,
       change: null,
     });
+  });
+
+  it('should parse focus name', () => {
+    const params = parseSearchString(
+      '?zone=example.com.&focus=www.example.com.',
+    );
+
+    expect(params.zone).toBe('example.com.');
+    expect(params.focus).toBe('www.example.com.');
   });
 
   it('should handle URL-encoded values', () => {
@@ -260,6 +273,15 @@ describe('buildQueryString', () => {
     expect(url).toBe('?q=test&all=true');
   });
 
+  it('should include focus name', () => {
+    const url = buildQueryString({
+      zone: 'example.com.',
+      focus: 'www.example.com.',
+    });
+
+    expect(url).toBe('?zone=example.com.&focus=www.example.com.');
+  });
+
   it('should exclude all zones flag when false', () => {
     const url = buildQueryString({
       searchQuery: 'test',
@@ -323,6 +345,18 @@ describe('URL round-trip', () => {
 
     expect(parsed.zone).toBe(original.zone);
     expect(parsed.page).toBe(1);
+  });
+
+  it('should round-trip zone focus name', () => {
+    const original = {
+      zone: 'example.com.',
+      focus: 'www.example.com.',
+    };
+    const queryString = buildQueryString(original);
+    const parsed = parseSearchString(queryString);
+
+    expect(parsed.zone).toBe(original.zone);
+    expect(parsed.focus).toBe(original.focus);
   });
 
   it('should round-trip zone with pagination', () => {

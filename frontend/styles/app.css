@@ -538,6 +538,22 @@ td {
     color: var(--accent-primary);
 }
 
+a.record-name-link {
+    color: var(--accent-primary);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+a.record-name-link:hover {
+    text-decoration: underline;
+}
+
+a.record-name-link:focus-visible {
+    outline: 2px solid var(--accent-primary-ring);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
 .record-type {
     display: inline-block;
     padding: 0.2rem 0.5rem;

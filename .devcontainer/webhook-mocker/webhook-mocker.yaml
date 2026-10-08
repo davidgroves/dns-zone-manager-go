@@ -1,0 +1,21 @@
+# Local [webhook-mocker](https://github.com/davidgroves/webhook-mocker) fixture.
+# Started by the WEBHOOKS VS Code task. UI: http://localhost:5080/
+#
+# Keep in sync with the inlined `webhook_mocker_config` in
+# .devcontainer/docker-compose.yml (Compose cannot bind-mount this path from
+# inside the nested `dev` container).
+#
+# Stable Teams Workflows URL used by .devcontainer/config.devcontainer.yaml:
+#   http://localhost:5080/teams/workflows/dns-dev
+
+listen: 0.0.0.0:5080
+public_url: http://localhost:5080
+channels:
+  - kind: teams
+    name: dns
+    token: dns-dev
+strict: false
+auto_create: true
+max_messages: 500
+max_body: 1048576
+json_logs: true

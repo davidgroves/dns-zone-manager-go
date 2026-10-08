@@ -51,7 +51,7 @@ Sign in using one of the example API keys: `demo-api-key-12345`
 
 Observability stack (`grafana/otel-lgtm`) scrapes `/metrics` and receives OTLP logs:
 
-- **Grafana**: http://localhost:3000 (open the **DNS Zone Manager** dashboard)
+- **Grafana**: http://localhost:3000 (no login). Open the **DNS Zone Manager** dashboard.
 - **Logs**: Explore → Loki → `{service_name="dns-zone-manager"}`. Lines are logfmt (`| logfmt | reason="serial_unchanged"`). Indexed labels: `event`, `zone`, `request_method`, `response_outcome`, `response_status_code`.
 - **Metrics**: Explore → Prometheus → `dns_zone_manager_*`
 
@@ -94,13 +94,13 @@ BIND sends NOTIFY to the API for **all** zones (via the compose entrypoint's `al
 
 `always-changing.example` is seeded with fixed names that an opt-in sidecar keeps updating:
 
-| Prefix | Writer |
-|--------|--------|
+| Name | Writer |
+|------|--------|
 | `ddns-*` | Direct TSIG `nsupdate` to BIND (DDNS ticks) |
 | `api-*` | REST `PUT /v1/zones/.../rrsets` (API ticks) |
-| `both-*` | DDNS then API in the same tick (BOTH ticks) |
+| `both` | Alternating DDNS-only and API-only ticks |
 
-The sidecar cycles **DDNS → API → BOTH** one mode per interval.
+The sidecar cycles **DDNS → API → BOTH(ddns) → DDNS → API → BOTH(api)** one mode per interval.
 
 Enable the sidecar (off by default so demos/tests stay quiet):
 

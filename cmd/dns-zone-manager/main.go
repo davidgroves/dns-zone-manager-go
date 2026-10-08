@@ -204,7 +204,10 @@ func runServe(configPath, host string, port int, uiDir string) error {
 	}
 
 	if settings.Scheduler.Enabled && st != nil {
-		go scheduler.RunLoop(ctx, st, client, cache, settings.Scheduler, settings.Retention, provDep)
+		broadcastLive := func(zone string, ops []dnsx.Operation) {
+			live.BroadcastApplied(hub, zone, notifications.TriggerScheduler, ops, nil)
+		}
+		go scheduler.RunLoop(ctx, st, client, cache, settings.Scheduler, settings.Retention, provDep, broadcastLive)
 	}
 
 	deps := httpapi.Deps{

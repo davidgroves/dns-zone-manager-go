@@ -1,9 +1,11 @@
 #!/bin/sh
 # Continuously mutate always-changing.example via direct DDNS and the REST API.
-# Each tick uses exactly one mode, cycling: DDNS → API → BOTH → DDNS → …
-#   DDNS: update ddns-* via nsupdate
-#   API:  update api-* via PUT /v1/.../rrsets
-#   BOTH: update both-* via nsupdate then API
+# Each tick uses exactly one mode, cycling:
+#   DDNS → API → BOTH(ddns) → DDNS → API → BOTH(api) → …
+#   DDNS:       update ddns-* via nsupdate
+#   API:        update api-* via PUT /v1/.../rrsets
+#   BOTH(ddns): update both via nsupdate
+#   BOTH(api):  update both via PUT /v1/.../rrsets
 set -eu
 
 ZONE="${ZONE:-always-changing.example.}"
@@ -70,6 +72,28 @@ send
 EOF
 }
 
+ddns_delete() {
+  name="$1"
+  nsupdate -y "${TSIG_ALG}:${TSIG_NAME}:${TSIG_SECRET}" <<EOF
+server ${BIND_HOST} ${BIND_PORT}
+zone ${ZONE}
+update delete ${name}.${ZONE} A
+send
+EOF
+}
+
+# Drop legacy both-1/2/3 left over from older seeds; ensure single `both` exists.
+ensure_both_seed() {
+  for i in 1 2 3; do
+    ddns_delete "both-${i}" || true
+  done
+  if ! ddns_set "both" "203.0.113.16"; then
+    log "warning: failed to seed both"
+    return 1
+  fi
+  refresh_zone || log "warning: zone refresh after both seed failed"
+}
+
 api_set() {
   name="$1"
   addr="$2"
@@ -90,42 +114,39 @@ api_set() {
   fi
 }
 
-# Drop and reload zone cache so API PUT prerequisites match BIND after external DDNS.
+# Soft-refresh zone cache so API PUT prerequisites match BIND after external DDNS.
+# Do not DELETE the cache: that races the NOTIFY listener (PeekZone nil → dropped
+# live broadcast) and is why both rows used to miss UI flashes.
 refresh_zone() {
   if [ -n "$API_KEY" ]; then
-    curl -sf --max-time 10 -X DELETE \
-      "${API_BASE}/v1/zones/${ZONE_PATH}/cache" \
-      -H "X-API-Key: ${API_KEY}" \
-      >/dev/null || true
     curl -sf --max-time 30 -X POST \
       "${API_BASE}/v1/zones/${ZONE_PATH}/refresh" \
       -H "X-API-Key: ${API_KEY}" \
       >/dev/null
   else
-    curl -sf --max-time 10 -X DELETE \
-      "${API_BASE}/v1/zones/${ZONE_PATH}/cache" \
-      >/dev/null || true
     curl -sf --max-time 30 -X POST \
       "${API_BASE}/v1/zones/${ZONE_PATH}/refresh" \
       >/dev/null
   fi
 }
 
-log "starting ZONE=${ZONE} BIND=${BIND_HOST}:${BIND_PORT} API=${API_BASE} interval=${INTERVAL_SEC}s cycle=DDNS,API,BOTH"
+log "starting ZONE=${ZONE} BIND=${BIND_HOST}:${BIND_PORT} API=${API_BASE} interval=${INTERVAL_SEC}s cycle=DDNS,API,BOTH(ddns),DDNS,API,BOTH(api)"
 wait_for_bind
 wait_for_api
+ensure_both_seed
+log "seeded both=203.0.113.16 (removed legacy both-1/2/3 if present)"
 
 n=0
 while true; do
   n=$((n + 1))
   octet=$(( (n % 200) + 20 ))
   addr="203.0.113.${octet}"
-  # Cycle: 1=DDNS, 2=API, 3=BOTH
-  phase=$(( (n - 1) % 3 ))
+  # Cycle: DDNS → API → BOTH(ddns) → DDNS → API → BOTH(api)
+  phase=$(( (n - 1) % 6 ))
 
   status=ok
   case "$phase" in
-    0)
+    0|3)
       mode=DDNS
       for i in 1 2 3; do
         if ! ddns_set "ddns-${i}" "$addr"; then
@@ -133,7 +154,7 @@ while true; do
         fi
       done
       ;;
-    1)
+    1|4)
       mode=API
       if ! refresh_zone; then
         log "tick=${n} warning: zone refresh failed"
@@ -145,20 +166,19 @@ while true; do
       done
       ;;
     2)
-      mode=BOTH
-      for i in 1 2 3; do
-        if ! ddns_set "both-${i}" "$addr"; then
-          status=fail
-        fi
-      done
+      mode='BOTH(ddns)'
+      if ! ddns_set "both" "$addr"; then
+        status=fail
+      fi
+      ;;
+    5)
+      mode='BOTH(api)'
       if ! refresh_zone; then
         log "tick=${n} warning: zone refresh failed"
       fi
-      for i in 1 2 3; do
-        if ! api_set "both-${i}" "$addr"; then
-          status=fail
-        fi
-      done
+      if ! api_set "both" "$addr"; then
+        status=fail
+      fi
       ;;
   esac
 

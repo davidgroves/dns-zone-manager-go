@@ -127,19 +127,19 @@ scheduler:
 # Outbound change webhooks (Slack / Teams / generic).
 # Manual DNS edits are autorecorded into the scheduler/audit store whenever the
 # scheduler store is open (default); that does not require webhooks.enabled.
-# Leave enabled false here so local dev does not retry unreachable targets.
-# Add a target and set enabled: true to exercise real delivery.
+#
+# Teams notifications go to local webhook-mocker (WEBHOOKS task / Run All
+# Complete). UI: http://localhost:5080 — open the "dns" virtual channel.
+# If the mocker is not running, deliveries retry then exhaust (harmless).
 webhooks:
-  enabled: false
-  base_url: http://localhost:8000
-  # targets:
-  #   - name: local-sink
-  #     type: generic
-  #     url: http://localhost:9099/hook
-  #     allow_insecure: true
-  #     auth:
-  #       type: hmac
-  #       secret: dev-signing-secret
+  enabled: true
+  # Traefik OIDC front door (not direct :8000) so "View change" opens the demo UI.
+  base_url: http://localhost:8080
+  targets:
+    - name: teams-dns
+      type: teams
+      url: http://localhost:5080/teams/workflows/dns-dev
+      allow_insecure: true
 
 # Logging - use text format for local development (human-readable)
 logging:

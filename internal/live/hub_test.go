@@ -1,11 +1,51 @@
 package live_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
+	"github.com/davidgroves/dns-zone-manager-go/internal/dnsx"
 	"github.com/davidgroves/dns-zone-manager-go/internal/live"
 )
+
+func TestBroadcastAppliedSkipsEmpty(t *testing.T) {
+	h := live.NewHub(live.HubConfig{ChannelSize: 4})
+	// Must not panic with nil hub / empty ops.
+	live.BroadcastApplied(nil, "example.com.", "api", nil, nil)
+	live.BroadcastApplied(h, "example.com.", "api", nil, nil)
+}
+
+func TestBroadcastAppliedSetsZoneAndOps(t *testing.T) {
+	h := live.NewHub(live.HubConfig{ChannelSize: 4})
+	sub, err := h.Subscribe("example.com.", "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sub.Unsubscribe()
+
+	serial := uint32(42)
+	live.BroadcastApplied(h, "example.com.", "api", []dnsx.Operation{
+		{Action: "replace", Name: "www.example.com.", Type: "A", Class: "IN", TTL: 60, Records: []string{"192.0.2.1"}},
+	}, &serial)
+
+	select {
+	case raw := <-sub.Events:
+		var payload map[string]any
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload["type"] != "zone_change" || payload["zone"] != "example.com." || payload["trigger"] != "api" {
+			t.Fatalf("payload=%v", payload)
+		}
+		ops, ok := payload["operations"].([]any)
+		if !ok || len(ops) != 1 {
+			t.Fatalf("operations=%v", payload["operations"])
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for broadcast")
+	}
+}
 
 func TestHubBroadcastDropsSlowClient(t *testing.T) {
 	h := live.NewHub(live.HubConfig{

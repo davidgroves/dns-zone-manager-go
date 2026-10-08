@@ -394,6 +394,26 @@ func buildRRs(fqdn string, typ, class uint16, ttl uint32, records []string) ([]d
 	return out, nil
 }
 
+// OperationsFromCacheUpdates converts optimistic cache mutations into live WS operations.
+func OperationsFromCacheUpdates(updates []CacheUpdate) []Operation {
+	out := make([]Operation, 0, len(updates))
+	for _, cu := range updates {
+		class := cu.Class
+		if class == "" {
+			class = "IN"
+		}
+		out = append(out, Operation{
+			Action:  strings.ToLower(cu.Action),
+			Name:    cu.Name,
+			Type:    strings.ToUpper(cu.RdType),
+			Class:   strings.ToUpper(class),
+			TTL:     cu.TTL,
+			Records: cu.Records,
+		})
+	}
+	return out
+}
+
 // ApplyCacheUpdates applies optimistic cache mutations after a successful DDNS update.
 func ApplyCacheUpdates(z *Zone, updates []CacheUpdate) error {
 	if z == nil {

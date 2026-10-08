@@ -42,7 +42,10 @@ services:
       - -c
       - |
         set -e
+        # Re-seed from source and drop journals so prior DDNS (e.g. old both-1/2/3)
+        # cannot resurrect names removed from the seed files.
         cp /etc/bind/zones-source/* /var/lib/bind/
+        rm -f /var/lib/bind/*.jnl
         chmod 666 /var/lib/bind/*
         mkdir -p /perf-zones /managed-zones
         chmod 777 /perf-zones /managed-zones
@@ -192,6 +195,10 @@ services:
     hostname: lgtm
     environment:
       - TZ=UTC
+      # Local dev only: open the UI with no login (anonymous Admin).
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
       - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/otel-lgtm/grafana/conf/provisioning/dashboards/custom/dns-zone-manager.json
     ports:
       - "3000:3000"   # Grafana UI

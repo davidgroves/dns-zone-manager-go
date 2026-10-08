@@ -22,6 +22,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/davidgroves/dns-zone-manager-go/internal/auth"
+	"github.com/davidgroves/dns-zone-manager-go/internal/catalog"
 	"github.com/davidgroves/dns-zone-manager-go/internal/config"
 	"github.com/davidgroves/dns-zone-manager-go/internal/dnsx"
 	"github.com/davidgroves/dns-zone-manager-go/internal/httpapi"
@@ -146,9 +147,23 @@ func startBINDAPI(t *testing.T, opts stackOptions) *bindAPIStack {
 		MaxConnections: 10, MaxConnectionsPerIP: 5,
 		SendTimeout: time.Second, PingInterval: time.Minute,
 	})
+	var catIndexer *catalog.Indexer
+	var catalogDep httpapi.CatalogIndexer
+	var catSrc provision.CatalogSource
+	if settings.Catalog.Enabled && settings.Catalog.ZoneName != "" {
+		catIndexer = catalog.New(catalog.ConfigFromSettings(settings), client)
+		if err := catIndexer.Start(ctx); err != nil {
+			t.Logf("catalog indexer start: %v", err)
+			catIndexer = nil
+		} else {
+			t.Cleanup(catIndexer.Stop)
+			catalogDep = catIndexer
+			catSrc = catIndexer
+		}
+	}
 	var prov httpapi.ZoneProvisioner
 	if opts.withRNDC {
-		prov = provision.New(settings, client, cache, nil, st)
+		prov = provision.New(settings, client, cache, catSrc, st)
 	}
 	handler := httpapi.New(httpapi.Deps{
 		Settings:    settings,
@@ -157,6 +172,7 @@ func startBINDAPI(t *testing.T, opts stackOptions) *bindAPIStack {
 		Cache:       cache,
 		Store:       st,
 		Hub:         hub,
+		Catalog:     catalogDep,
 		Provisioner: prov,
 		DNSReady:    func(context.Context) bool { return true },
 		StoreReady:  func(context.Context) bool { return st == nil || st.Ping(context.Background()) },

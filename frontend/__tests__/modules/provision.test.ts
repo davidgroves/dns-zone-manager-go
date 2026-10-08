@@ -63,4 +63,28 @@ describe('provision', () => {
     expect(toasts.some((t) => t.message === 'Zone created')).toBe(true);
     expect(ctx.selectZone).toHaveBeenCalled();
   });
+
+  it('publishes a zone to the catalog', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === 'PUT') {
+          return {
+            ok: true,
+            json: async () => ({ zone: 'staged.example.', catalog_added: true }),
+          };
+        }
+        return { ok: true, json: async () => ({}) };
+      }),
+    );
+    const { ctx, toasts } = makeCtx({
+      selectedZone: 'staged.example.',
+      showPublishCatalogConfirm: true,
+    });
+    await ctx.publishSelectedZoneToCatalog();
+    expect(toasts.some((t) => t.message === 'Zone published to catalog')).toBe(
+      true,
+    );
+    expect(ctx.loadCatalogStatus).toHaveBeenCalled();
+  });
 });

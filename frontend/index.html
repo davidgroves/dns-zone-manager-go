@@ -838,9 +838,19 @@
                                                         </template>
                                                     </td>
                                                     <td>
-                                                        <span class="record-name" 
-                                                              :class="{ 'idn-label': item.name_is_idn }"
-                                                              x-text="item.name.replace(/\.$/, '')"></span>
+                                                        <template x-if="searchAllZones">
+                                                            <a class="record-name record-name-link"
+                                                               :href="zoneNameHref(item.zone, item.name)"
+                                                               :class="{ 'idn-label': item.name_is_idn }"
+                                                               :title="'Open ' + item.zone.replace(/\.$/, '') + ' and scroll to this name'"
+                                                               @click.prevent="goToZoneName(item.zone, item.name)"
+                                                               x-text="item.name.replace(/\.$/, '')"></a>
+                                                        </template>
+                                                        <template x-if="!searchAllZones">
+                                                            <span class="record-name"
+                                                                  :class="{ 'idn-label': item.name_is_idn }"
+                                                                  x-text="item.name.replace(/\.$/, '')"></span>
+                                                        </template>
                                                         <template x-if="item.name_is_idn">
                                                             <span class="badge badge-info badge-xs badge-clickable" 
                                                                   :title="item.name_utf8 + '\nClick to copy to clipboard'"
@@ -1038,7 +1048,8 @@
                                         </thead>
                                         <tbody>
                                             <template x-for="record in filteredRecords" :key="record.name + record.type + (record.rdclass || 'IN')">
-                                                <tr :class="{ 'live-flash': isLiveFlashing(record) }">
+                                                <tr :data-rrset-name="record.name"
+                                                    :class="{ 'live-flash': isLiveFlashing(record) }">
                                                     <td>
                                                         <span class="record-name" 
                                                               :class="{ 'idn-label': record.name_is_idn }"

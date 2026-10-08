@@ -224,6 +224,7 @@ func runNSUpdate(ctx context.Context, d *Deps, text, defaultZone string, dryRun 
 					_ = dnsx.ApplyCacheUpdates(cz.Zone, built.CacheUpdates)
 				}
 			}
+			d.broadcastLiveOps(zone, "api", dnsx.OperationsFromCacheUpdates(built.CacheUpdates))
 		}
 		results = append(results, tr)
 	}

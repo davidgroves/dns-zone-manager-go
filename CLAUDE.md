@@ -31,6 +31,7 @@ internal/
   ui/dist/                # embedded SPA (go:embed)
 frontend/                 # Alpine.js SPA source
 .devcontainer/entra/      # Entra emulator fixture (users + app registrations)
+.devcontainer/webhook-mocker/  # Teams/Slack webhook-mocker fixture
 ```
 
 ## Patterns
@@ -48,6 +49,8 @@ frontend/                 # Alpine.js SPA source
 - Dev OIDC front door: Traefik → oauth2-proxy → Entra emulator; identity
   arrives as `X-Auth-Request-*` (`proxy_auth`). Falls back to Preferred-Username
   / User when Email is absent. Direct `:8000` uses API key `dev`.
+- Dev Teams webhooks: webhook-mocker on `:5080` (WEBHOOKS task); config target
+  `teams-dns` → `http://localhost:5080/teams/workflows/dns-dev`.
 
 ## Commands
 
